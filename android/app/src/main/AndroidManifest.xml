@@ -1,0 +1,28 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+
+    <application
+        android:label="wallpaper_app_first"
+        android:icon="@mipmap/ic_launcher">
+
+        <!-- FQCN: paket nomi bilan to‘liq -->
+        <activity
+            android:name="com.example.sherdorapp.wallpaper_app_first.MainActivity"
+            android:exported="true"
+            android:theme="@style/LaunchTheme">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+        </activity>
+
+        <meta-data android:name="flutterEmbedding" android:value="2" />
+    </application>
+</manifest>
