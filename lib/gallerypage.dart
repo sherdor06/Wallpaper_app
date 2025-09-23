@@ -14,7 +14,7 @@ class GalleryPage extends StatelessWidget {
       backgroundColor: Colors.black12,
       appBar: AppBar(
         title: const Text(
-          'Wallpapers',
+          'Wallpaperss',
           style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor:Colors.black12 ,
