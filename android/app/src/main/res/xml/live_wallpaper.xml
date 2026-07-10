@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Jonli wallpaper deskriptori (tizim wallpaper tanlagichida ko'rinadi). -->
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:label="Wallpapers 4K Live"
+    android:thumbnail="@mipmap/ic_launcher" />

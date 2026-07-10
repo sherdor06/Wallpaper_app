@@ -43,3 +43,20 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Kontent pipeline (scripts/) — maxfiy kalitlar va katta fayllar
+scripts/.env
+scripts/raw/
+scripts/out/
+scripts/venv/
+scripts/__pycache__/
+
+# Android release imzolash kalitlari — HECH QACHON repo'ga qo'shmang
+android/key.properties
+android/app/upload-keystore.jks
+*.jks
+
+# Telegram login session (maxfiy — commit qilinmasin)
+scripts/*.session
+scripts/*.session-journal
+scripts/__pycache__/

@@ -4,9 +4,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Release imzolash kalitlari (android/key.properties — repo'ga kirmaydi).
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader("UTF-8") { keystoreProperties.load(it) }
+}
+
 android {
-    namespace = "com.example.sherdorapp.wallpaper_app_first"
+    namespace = "com.sherdor.wallpapers"
     compileSdk = flutter.compileSdkVersion
+    // O'rnatilgan sog'lom NDK (buzilgan 27.0.12077973 o'rniga). Re-download shart emas.
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -15,16 +24,34 @@ android {
     kotlinOptions { jvmTarget = JavaVersion.VERSION_11.toString() }
 
     defaultConfig {
-        applicationId = "com.example.sherdorapp.wallpaper_app_first"
+        applicationId = "com.sherdor.wallpapers"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            // key.properties bo'lsa release kalit, bo'lmasa debug (CI/boshqa mashina).
+            signingConfig = keystorePropertiesFile.exists()
+                ? signingConfigs.getByName("release")
+                : signingConfigs.getByName("debug")
+            // R8: kodni qisqartirish + obfuskatsiya, resurslarni tozalash (AAB hajmi kichrayadi).
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
 }

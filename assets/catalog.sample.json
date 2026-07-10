@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "categories": [
+    { "id": "nature", "name": "Nature" },
+    { "id": "city", "name": "City" },
+    { "id": "abstract", "name": "Abstract" },
+    { "id": "live", "name": "Live" }
+  ],
+  "wallpapers": [
+    {
+      "id": "nature_001",
+      "title": "Mountain Mist",
+      "category": "nature",
+      "type": "image",
+      "resolution": "FHD",
+      "premium": false,
+      "thumb": "https://picsum.photos/id/1018/360/640",
+      "full": "https://picsum.photos/id/1018/1080/1920"
+    },
+    {
+      "id": "nature_002",
+      "title": "Coastline",
+      "category": "nature",
+      "type": "image",
+      "resolution": "FHD",
+      "premium": false,
+      "thumb": "https://picsum.photos/id/1035/360/640",
+      "full": "https://picsum.photos/id/1035/1080/1920"
+    },
+    {
+      "id": "city_001",
+      "title": "City Lights",
+      "category": "city",
+      "type": "image",
+      "resolution": "FHD",
+      "premium": false,
+      "thumb": "https://picsum.photos/id/1043/360/640",
+      "full": "https://picsum.photos/id/1043/1080/1920"
+    },
+    {
+      "id": "abstract_001",
+      "title": "Aurora 4K",
+      "category": "abstract",
+      "type": "image",
+      "resolution": "4K",
+      "premium": true,
+      "thumb": "https://picsum.photos/id/1050/360/640",
+      "full": "https://picsum.photos/id/1050/2160/3840"
+    },
+    {
+      "id": "abstract_002",
+      "title": "Neon Night 4K",
+      "category": "abstract",
+      "type": "image",
+      "resolution": "4K",
+      "premium": true,
+      "thumb": "https://picsum.photos/id/1069/360/640",
+      "full": "https://picsum.photos/id/1069/2160/3840"
+    },
+    {
+      "id": "live_001",
+      "title": "Ocean Waves Live",
+      "category": "live",
+      "type": "live",
+      "resolution": "4K",
+      "premium": true,
+      "thumb": "https://picsum.photos/id/1084/360/640",
+      "full": "https://picsum.photos/id/1084/2160/3840",
+      "video": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "_comment": "Kategoriyalar va premium qoidasi. Yangi kategoriya qo'shsangiz shu yerga yozing.",
+  "premium_if_4k": false,
+  "categories": {
+    "popular":  { "name": "Popular",  "premium": false },
+    "gradient": { "name": "Gradient", "premium": false },
+    "amoled":   { "name": "AMOLED",   "premium": false },
+    "abstract": { "name": "Abstract", "premium": false },
+    "minimal":  { "name": "Minimal",  "premium": false },
+    "nature":   { "name": "Nature",   "premium": false },
+    "city":     { "name": "City",     "premium": false },
+    "space":    { "name": "Space",    "premium": false },
+    "anime":    { "name": "Anime",    "premium": false },
+    "live":     { "name": "Live",     "premium": false }
+  }
+}

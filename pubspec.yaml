@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.8.1
+  sdk: ^3.9.2
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -38,6 +38,13 @@ dependencies:
   dio: ^5.4.0                     # yuklab olish
   path_provider: ^2.1.3           # fayl yo'li
   permission_handler: ^11.3.1     # (ixtiyoriy) ruxsatlar
+  liquid_glass_widgets: ^0.19.1   # liquid glass UI (chrome + widgetlar)
+  cupertino_native: ^0.0.1        # iOS native Liquid Glass tab bar (CNTabBar)
+  google_mobile_ads: ^5.2.0       # AdMob reklama (banner + interstitial)
+  lottie: ^3.1.0                  # Lottie animatsiyalar (loading/splash/empty)
+  url_launcher: ^6.3.0            # tashqi havolalar (privacy, rate, email)
+  flutter_cache_manager: ^3.4.1  # keshni tozalash (Settings)
+  package_info_plus: ^8.1.0       # app versiyasini pubspec'dan olish (Settings)
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -48,6 +55,25 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.1  # ikonka generatori (build-time tool)
+  flutter_native_splash: ^2.4.1    # splash generatori (build-time tool)
+
+# Ikonka konfiguratsiyasi: `dart run flutter_launcher_icons`
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#5A48DB"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+
+# Splash konfiguratsiyasi: `dart run flutter_native_splash:create`
+flutter_native_splash:
+  color: "#0E0E12"
+  image: "assets/icon/splash.png"
+  android_12:
+    color: "#0E0E12"
+    image: "assets/icon/splash.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -60,10 +86,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # Bundled namuna katalog — CDN sozlanmaganda yoki offline holatda fallback.
+  assets:
+    - assets/catalog.sample.json
+    - assets/anim/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
