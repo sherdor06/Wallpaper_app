@@ -60,3 +60,8 @@ android/app/upload-keystore.jks
 scripts/*.session
 scripts/*.session-journal
 scripts/__pycache__/
+
+# Firebase config — public repo'dan tashqarida (API key'li mijoz konfig; diskda qoladi)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart

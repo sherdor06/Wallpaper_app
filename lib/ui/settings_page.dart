@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/image_cache.dart';
+import '../services/theme_service.dart';
 
 /// App settings / about screen: legal, storage, feedback and version info.
 class SettingsPage extends StatelessWidget {
@@ -40,6 +41,28 @@ class SettingsPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          const _SectionHeader('Appearance'),
+          ListenableBuilder(
+            listenable: ThemeService.instance,
+            builder: (context, _) {
+              final mode = ThemeService.instance.mode;
+              return Column(
+                children: [
+                  for (final m in ThemeMode.values)
+                    ListTile(
+                      leading: Icon(_themeIcon(m)),
+                      title: Text(_themeLabel(m)),
+                      trailing: mode == m
+                          ? Icon(Icons.check,
+                              color: Theme.of(context).colorScheme.primary)
+                          : null,
+                      onTap: () => ThemeService.instance.setMode(m),
+                    ),
+                ],
+              );
+            },
+          ),
+          const Divider(height: 0),
           const _SectionHeader('Legal'),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
@@ -91,6 +114,18 @@ class SettingsPage extends StatelessWidget {
     );
   }
 }
+
+String _themeLabel(ThemeMode m) => switch (m) {
+      ThemeMode.system => 'System',
+      ThemeMode.light => 'Light',
+      ThemeMode.dark => 'Dark',
+    };
+
+IconData _themeIcon(ThemeMode m) => switch (m) {
+      ThemeMode.system => Icons.brightness_auto_outlined,
+      ThemeMode.light => Icons.light_mode_outlined,
+      ThemeMode.dark => Icons.dark_mode_outlined,
+    };
 
 class _SectionHeader extends StatelessWidget {
   final String title;

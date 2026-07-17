@@ -6,7 +6,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../data/wallpaper_repository.dart';
 import '../models/wallpaper.dart';
 import 'widgets/app_loader.dart';
-import 'widgets/frosted_bar.dart';
+import 'widgets/floating_chrome.dart';
 import 'widgets/wallpaper_grid.dart';
 
 /// Height of the search header: 8 + GlassSearchBar (44) + 8.
@@ -62,51 +62,37 @@ class _SearchTabState extends State<SearchTab> {
         return WallpaperGrid(
           items: _filter(catalog),
           emptyText: 'Nothing found',
-          topPadding: Platform.isAndroid ? 8 : _headerTopInset(context),
+          topPadding: _headerTopInset(context),
         );
       },
     );
 
-    // Android: simple Column, solid search field (no glass, no blur).
-    if (Platform.isAndroid) {
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            child: _searchField(),
-          ),
-          Expanded(child: grid),
-        ],
-      );
-    }
-
-    // iOS: grid scrolls behind the translucent app bar; the search field floats
-    // in a frosted header just below it.
+    // Both platforms: the grid fills the tab (edge-to-edge) and scrolls behind
+    // the floating chrome; the search field floats just below the title row.
     final topInset = MediaQuery.of(context).padding.top;
     return Stack(
       children: [
         Positioned.fill(child: grid),
         Positioned(
-          top: topInset,
+          top: topInset + kTopChrome,
           left: 0,
           right: 0,
-          child: FrostedBar(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-              child: _searchField(),
-            ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: _searchField(),
           ),
         ),
       ],
     );
   }
 
-  /// iOS grid top inset: app bar bottom + the floating search header height.
+  /// Grid top inset: status bar + floating title row + search header height.
   double _headerTopInset(BuildContext context) =>
-      MediaQuery.of(context).padding.top + _searchHeaderHeight;
+      MediaQuery.of(context).padding.top + kTopChrome + _searchHeaderHeight;
 
-  /// Search input: liquid [GlassSearchBar] on iOS, a plain filled field on
-  /// Android (no glass shader — jank-free).
+  /// Search input: liquid [GlassSearchBar] on iOS, a solid theme-aware field
+  /// on Android (no glass shader — jank-free; near-opaque so it stays readable
+  /// while floating over the photos).
   Widget _searchField() {
     if (!Platform.isAndroid) {
       return GlassSearchBar(
@@ -115,16 +101,18 @@ class _SearchTabState extends State<SearchTab> {
         onChanged: (v) => setState(() => _query = v),
       );
     }
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final hint = dark ? Colors.white54 : Colors.black45;
     return TextField(
       controller: _controller,
       onChanged: (v) => setState(() => _query = v),
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: dark ? Colors.white : Colors.black87),
       decoration: InputDecoration(
         hintText: 'Search wallpapers...',
-        hintStyle: const TextStyle(color: Colors.white54),
-        prefixIcon: const Icon(Icons.search, color: Colors.white54),
+        hintStyle: TextStyle(color: hint),
+        prefixIcon: Icon(Icons.search, color: hint),
         filled: true,
-        fillColor: const Color(0x14FFFFFF),
+        fillColor: dark ? const Color(0xF21C1C26) : Colors.white,
         contentPadding: const EdgeInsets.symmetric(vertical: 0),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),

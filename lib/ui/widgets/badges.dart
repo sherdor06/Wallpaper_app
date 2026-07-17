@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -20,29 +22,42 @@ class WallpaperBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Liquid-glass background; the icon keeps its accent color (red=LIVE, amber=PRO)
-    // so the meaning stays readable through the glass.
-    return GlassContainer(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      shape: const LiquidRoundedSuperellipse(borderRadius: 14),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 13, color: color == Colors.black54 ? Colors.white : color),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-            ),
-          ),
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 13, color: color == Colors.black54 ? Colors.white : color),
+          const SizedBox(width: 3),
         ],
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+    if (!Platform.isAndroid) {
+      // iOS: liquid-glass background; the icon keeps its accent color (red=LIVE)
+      // so the meaning stays readable through the glass.
+      return GlassContainer(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        shape: const LiquidRoundedSuperellipse(borderRadius: 14),
+        child: content,
+      );
+    }
+    // Android: solid dark scrim pill — readable over any photo, and no glass
+    // shader cost in every grid cell (this badge is drawn dozens of times).
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xB3000000),
+        borderRadius: BorderRadius.circular(14),
       ),
+      child: content,
     );
   }
 }

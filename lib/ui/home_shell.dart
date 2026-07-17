@@ -9,7 +9,7 @@ import 'home_tab.dart';
 import 'search_tab.dart';
 import 'settings_page.dart';
 import 'widgets/ad_banner_placeholder.dart';
-import 'widgets/frosted_bar.dart';
+import 'widgets/floating_chrome.dart';
 import 'widgets/glass_nav_bar.dart';
 
 const _accent = Color(0xFF6C5CE7);
@@ -51,43 +51,51 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    // Android: solid, no BackdropFilter (avoids jank). iOS: frosted glass.
-    final bool solid = Platform.isAndroid;
     return ListenableBuilder(
       listenable: FavoritesService.instance,
       builder: (context, _) {
         return Scaffold(
-          appBar: AppBar(
-            // iOS: transparent + frosted glass so the grid scrolls behind it.
-            // Android: solid bar from the theme (no blur).
-            backgroundColor: solid ? null : Colors.transparent,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            flexibleSpace: solid ? null : const FrostedBar(child: SizedBox.expand()),
-            title: Text(
-              _titles[_index],
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            actions: [
-              IconButton(
-                tooltip: 'Settings',
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+          // No app bar: the grid fills the whole screen and scrolls behind the
+          // floating chrome (title pill + settings button + bottom nav).
+          extendBodyBehindAppBar: true,
+          extendBody: true,
+          body: Stack(
+            children: [
+              IndexedStack(
+                index: _index,
+                children: [
+                  HomeTab(resetSignal: _homeReset),
+                  const FavoritesTab(),
+                  const SearchTab(),
+                ],
+              ),
+              // Floating top chrome: title pill (left) + settings (right),
+              // each its own liquid/solid button — content shows through.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Row(
+                      children: [
+                        TitlePill(text: _titles[_index]),
+                        const Spacer(),
+                        ChromeIconButton(
+                          icon: Icons.settings_outlined,
+                          tooltip: 'Settings',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const SettingsPage()),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
-          // iOS: let the grid extend behind the translucent bars. Android: bars
-          // take their own space (simpler, no content behind them).
-          extendBodyBehindAppBar: !solid,
-          extendBody: !solid,
-          body: IndexedStack(
-            index: _index,
-            children: [
-              HomeTab(resetSignal: _homeReset),
-              const FavoritesTab(),
-              const SearchTab(),
             ],
           ),
           // Floating glass nav on top, ad pinned to the very bottom.

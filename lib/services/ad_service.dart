@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import 'analytics_service.dart';
+import 'remote_config_service.dart';
+
 /// Manages AdMob ads (banner + interstitial). Ads are the only monetization —
 /// there is no premium/ad-free tier, so ads are always shown.
 ///
@@ -27,6 +30,10 @@ class AdService {
   static const bool adsHidden =
       bool.fromEnvironment('HIDE_ADS', defaultValue: false);
 
+  /// True when ads must not be shown at all — either the compile-time
+  /// [adsHidden] flag, or the `ads_enabled` Remote Config kill switch is off.
+  bool get _adsOff => adsHidden || !RemoteConfigService.instance.adsEnabled;
+
   InterstitialAd? _interstitial;
   RewardedAd? _rewarded;
   bool _initialized = false;
@@ -41,9 +48,11 @@ class AdService {
   Future<bool> get adsAllowed => _adsAllowed.future;
 
   // Frequency cap: show an interstitial at most every [_showEvery] actions and
-  // never more often than [_minGap] — avoids annoying users / AdMob policy issues.
-  static const int _showEvery = 3;
-  static const Duration _minGap = Duration(seconds: 45);
+  // never more often than [_minGap]. Both come from Remote Config (with safe
+  // defaults) so they can be tuned from the console without an app update.
+  int get _showEvery => RemoteConfigService.instance.adShowEvery;
+  Duration get _minGap =>
+      Duration(seconds: RemoteConfigService.instance.adMinGapSeconds);
   int _actionCount = 0;
   DateTime _lastShown = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -52,10 +61,9 @@ class AdService {
   static const _bannerAndroidReal = 'ca-app-pub-8510304338648685/8027204377';
   static const _interstitialIosReal = 'ca-app-pub-8510304338648685/3166558696';
   static const _interstitialAndroidReal = 'ca-app-pub-8510304338648685/3561345758';
-  // Rewarded (4K unlock). ⚠️ RELEASE: create Rewarded ad units in AdMob (Android
-  // + iOS) and paste their ids here — otherwise release just falls back to unlocked.
-  static const _rewardedIosReal = 'ca-app-pub-8510304338648685/REWARDED_IOS';
-  static const _rewardedAndroidReal = 'ca-app-pub-8510304338648685/REWARDED_ANDROID';
+  // Rewarded (4K unlock) — real AdMob unit ids (per app / platform).
+  static const _rewardedIosReal = 'ca-app-pub-8510304338648685/7828949747';
+  static const _rewardedAndroidReal = 'ca-app-pub-8510304338648685/5475651512';
 
   // --- Google test unit IDs (debug) ---
   static const _bannerIosTest = 'ca-app-pub-3940256099942544/2934735716';
@@ -108,8 +116,9 @@ class AdService {
     }
     _initialized = true;
 
-    if (adsHidden) {
-      // No ads in this build (debug/profile) — skip consent + loading entirely.
+    if (_adsOff) {
+      // Ads disabled (HIDE_ADS build or the Remote Config kill switch) — skip
+      // consent + loading entirely.
       if (!_adsAllowed.isCompleted) _adsAllowed.complete(false);
       return;
     }
@@ -178,7 +187,7 @@ class AdService {
   /// Show an interstitial (e.g. after a wallpaper is applied), subject to the
   /// frequency cap, then preload the next one. No-op if not due or none ready.
   Future<void> maybeShowInterstitial() async {
-    if (adsHidden || !_canRequestAds) return;
+    if (_adsOff || !_canRequestAds) return;
     _actionCount++;
     final due = _actionCount % _showEvery == 0 &&
         DateTime.now().difference(_lastShown) >= _minGap;
@@ -205,6 +214,7 @@ class AdService {
     _interstitial = null;
     try {
       await ad.show();
+      AnalyticsService.logAdImpression('interstitial');
     } catch (_) {
       // show() rarely throws; the failure callback already disposes/reloads.
     }
@@ -214,7 +224,7 @@ class AdService {
   /// reward was earned — or if ads are unavailable, so the user is never hard
   /// blocked by a missing/failed ad. Preloads the next rewarded afterwards.
   Future<bool> showRewardedToUnlock() async {
-    if (adsHidden || !_canRequestAds) return true;
+    if (_adsOff || !_canRequestAds) return true;
     final ad = _rewarded;
     if (ad == null) {
       _loadRewarded(); // not ready — grant this time, preload for next
@@ -237,6 +247,7 @@ class AdService {
     );
     try {
       await ad.show(onUserEarnedReward: (_, __) => earned = true);
+      AnalyticsService.logAdImpression('rewarded');
     } catch (_) {
       if (!done.isCompleted) done.complete(true);
     }

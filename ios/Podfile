@@ -1,5 +1,5 @@
-# cupertino_native plugin requires iOS 14+.
-platform :ios, '14.0'
+# Firebase iOS SDK 12.x requires iOS 15+ (cupertino_native needs 14+).
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'

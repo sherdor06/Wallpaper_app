@@ -7,11 +7,12 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../data/wallpaper_repository.dart';
 import '../models/wallpaper.dart';
 import 'widgets/app_loader.dart';
-import 'widgets/frosted_bar.dart';
+import 'widgets/floating_chrome.dart';
 import 'widgets/wallpaper_grid.dart';
 
 const _allCategory = 'all';
 const _accent = Color(0xFF6C5CE7);
+const _accentLight = Color(0xFF8E7BF5);
 
 /// Height of the horizontal category chip row.
 const double _categoryBarHeight = 48;
@@ -82,26 +83,9 @@ class _HomeTabState extends State<HomeTab> {
           onSelected: (id) => setState(() => _selected = id),
         );
 
-        // Android: simple Column (solid app bar takes its own space).
-        if (Platform.isAndroid) {
-          return Column(
-            children: [
-              categoryBar,
-              Expanded(
-                child: WallpaperGrid(
-                  items: items,
-                  onRefresh: _refresh,
-                  emptyText: 'No wallpapers in this category',
-                ),
-              ),
-            ],
-          );
-        }
-
-        // iOS: grid fills the tab and scrolls behind the translucent app bar;
-        // the category chips float in a frosted header just below it. With
-        // extendBodyBehindAppBar, MediaQuery.padding.top already equals the app
-        // bar's bottom (status bar + toolbar) — no extra kToolbarHeight.
+        // Both platforms: the grid fills the whole tab (edge-to-edge) and
+        // scrolls behind the floating chrome; the category chips float over
+        // the images just below the title row (no frosted band).
         final topInset = MediaQuery.of(context).padding.top;
         return Stack(
           children: [
@@ -110,14 +94,14 @@ class _HomeTabState extends State<HomeTab> {
                 items: items,
                 onRefresh: _refresh,
                 emptyText: 'No wallpapers in this category',
-                topPadding: topInset + _categoryBarHeight,
+                topPadding: topInset + kTopChrome + _categoryBarHeight,
               ),
             ),
             Positioned(
-              top: topInset,
+              top: topInset + kTopChrome,
               left: 0,
               right: 0,
-              child: FrostedBar(child: categoryBar),
+              child: categoryBar,
             ),
           ],
         );
@@ -259,8 +243,12 @@ class _CategoryBarState extends State<_CategoryBar> {
   }
 }
 
-/// A category chip: liquid [GlassChip] on iOS, a plain solid pill on Android
-/// (no glass shader — keeps the tab bar light and jank-free).
+/// A category chip.
+///
+/// Selected (both platforms): a solid accent-gradient pill with white text —
+/// clearly visible in light/dark themes and over photos. Unselected: liquid
+/// [GlassChip] on iOS, a theme-aware solid pill on Android (no glass shader —
+/// keeps the row light and jank-free).
 class _CategoryChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -274,22 +262,51 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!Platform.isAndroid) {
-      return GlassChip(label: label, selected: selected, onTap: onTap);
+    if (selected) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [_accent, _accentLight]),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: _accent.withValues(alpha: 0.45),
+                blurRadius: 12,
+                spreadRadius: -2,
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      );
     }
+    if (!Platform.isAndroid) {
+      return GlassChip(label: label, selected: false, onTap: onTap);
+    }
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? _accent : const Color(0x14FFFFFF),
+          color: dark ? const Color(0x2E1C1C26) : const Color(0xE6FFFFFF),
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: dark ? const Color(0x14FFFFFF) : const Color(0x14000000)),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : Colors.white70,
+            color: dark ? Colors.white70 : Colors.black87,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),

@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 
 import '../models/wallpaper.dart';
 import '../services/ad_service.dart';
+import '../services/analytics_service.dart';
 import '../services/favorites_service.dart';
 import '../services/image_cache.dart';
+import '../services/remote_config_service.dart';
 import '../services/unlock_service.dart';
 import '../services/wallpaper_service.dart';
 import 'widgets/badges.dart';
@@ -31,7 +33,12 @@ class _DetailPageState extends State<DetailPage> {
   Wallpaper get _w => widget.wallpaper;
 
   /// A 4K wallpaper that hasn't been unlocked yet needs a rewarded ad first.
-  bool get _locked => _w.is4k && !UnlockService.instance.isUnlocked(_w.id);
+  /// Skipped entirely when the `rewarded_required_for_4k` Remote Config flag is
+  /// off — then all 4K wallpapers are free to use.
+  bool get _locked =>
+      _w.is4k &&
+      RemoteConfigService.instance.rewardedRequiredFor4k &&
+      !UnlockService.instance.isUnlocked(_w.id);
 
   /// Ensures a 4K wallpaper is unlocked (via a rewarded ad) before proceeding.
   /// Returns true if the action may continue. Grants access when ads are
@@ -41,11 +48,18 @@ class _DetailPageState extends State<DetailPage> {
     final ok = await AdService.instance.showRewardedToUnlock();
     if (ok) {
       await UnlockService.instance.unlock(_w.id);
+      AnalyticsService.logRewardedUnlock(_w.id);
       if (mounted) setState(() {});
       return true;
     }
     _snack('Kept locked — watch the short video to unlock 4K');
     return false;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.logWallpaperView(_w.id, category: _w.category);
   }
 
   @override
@@ -77,6 +91,7 @@ class _DetailPageState extends State<DetailPage> {
           if (mounted) setState(() => _progress = p);
         },
       );
+      AnalyticsService.logWallpaperSet(_w.id, target: target.value);
       // Interstitial after apply — but not right after a rewarded (no double ad).
       if (!wasLocked) await AdService.instance.maybeShowInterstitial();
       _snack('Wallpaper set (${target.value})');
@@ -103,6 +118,7 @@ class _DetailPageState extends State<DetailPage> {
           if (mounted) setState(() => _progress = p);
         },
       );
+      AnalyticsService.logWallpaperDownload(_w.id);
       if (!wasLocked) await AdService.instance.maybeShowInterstitial();
       _snack('Saved to gallery');
     } catch (_) {
@@ -127,6 +143,7 @@ class _DetailPageState extends State<DetailPage> {
           if (mounted) setState(() => _progress = p);
         },
       );
+      AnalyticsService.logWallpaperDownload(_w.id);
       if (!wasLocked) await AdService.instance.maybeShowInterstitial();
       _snack('Saved! Open Photos → Share → Use as Wallpaper');
     } on PlatformException catch (e) {
@@ -154,6 +171,7 @@ class _DetailPageState extends State<DetailPage> {
           if (mounted) setState(() => _progress = p);
         },
       );
+      AnalyticsService.logWallpaperSet(_w.id, target: 'live');
       // The system live-wallpaper preview opens; the user confirms there.
       _snack('Tap "Set wallpaper" in the preview');
     } on PlatformException catch (e) {

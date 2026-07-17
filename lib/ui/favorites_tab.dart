@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/wallpaper_repository.dart';
 import '../services/favorites_service.dart';
 import 'widgets/app_loader.dart';
+import 'widgets/floating_chrome.dart';
 import 'widgets/wallpaper_grid.dart';
 
 /// Favorites tab: shows only the wallpapers the user has favorited.
@@ -48,14 +49,14 @@ class _FavoritesTabState extends State<FavoritesTab> {
             final items = (catalog?.wallpapers ?? const [])
                 .where((w) => favs.isFavorite(w.id))
                 .toList();
-            // No header here — just clear the translucent app bar. With
-            // extendBodyBehindAppBar, padding.top already equals the bar bottom.
+            // No header here — start just below the floating title row while
+            // still scrolling behind it.
             final topInset = MediaQuery.of(context).padding.top;
             return WallpaperGrid(
               items: items,
               onRefresh: _refresh,
               emptyText: 'No favorites yet',
-              topPadding: topInset,
+              topPadding: topInset + kTopChrome + 8,
             );
           },
         );

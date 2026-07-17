@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 const _accent = Color(0xFF6C5CE7);
 const _accentLight = Color(0xFF8E7BF5);
 
-/// One destination in [GlassNavBar] / [SegmentNavBar].
+/// One destination in [GlassNavBar] / [CircleNavBar].
 class GlassNavItem {
   final IconData icon; // shown when not selected
   final IconData activeIcon; // shown when selected
@@ -39,10 +39,10 @@ class GlassNavBar extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Container(
             height: 64,
-            color: const Color(0x14FFFFFF), // ~8% white translucent glass
+            color: const Color(0x0DFFFFFF), // ~5% white — very see-through glass
             padding: const EdgeInsets.all(6),
             child: _NavStack(
               currentIndex: currentIndex,
@@ -75,20 +75,22 @@ class CircleNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
       child: Container(
         height: 64,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C1C26),
+          color: dark ? const Color(0xFF1C1C26) : Colors.white,
           borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: const Color(0x14FFFFFF)),
-          boxShadow: const [
+          border: Border.all(
+              color: dark ? const Color(0x14FFFFFF) : const Color(0x14000000)),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x59000000),
+              color: dark ? const Color(0x59000000) : const Color(0x1F000000),
               blurRadius: 16,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -145,7 +147,7 @@ class CircleNavBar extends StatelessWidget {
                           size: 24,
                           color: i == currentIndex
                               ? Colors.white
-                              : Colors.white70,
+                              : (dark ? Colors.white70 : Colors.black54),
                         ),
                       ),
                     ),

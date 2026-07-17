@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -80,16 +82,32 @@ class _FavoriteButton extends StatelessWidget {
       listenable: FavoritesService.instance,
       builder: (context, _) {
         final fav = FavoritesService.instance.isFavorite(id);
-        // Liquid-glass round button; a red glow signals the favorited state.
-        return GlassIconButton(
-          icon: Icon(
-            fav ? Icons.favorite : Icons.favorite_border,
-            size: 18,
-            color: fav ? const Color(0xFFE53935) : Colors.white,
+        final heart = Icon(
+          fav ? Icons.favorite : Icons.favorite_border,
+          size: 18,
+          color: fav ? const Color(0xFFE53935) : Colors.white,
+        );
+        if (!Platform.isAndroid) {
+          // iOS: liquid-glass round button; a red glow signals the favorited state.
+          return GlassIconButton(
+            icon: heart,
+            size: 38,
+            glowColor: fav ? const Color(0xFFE53935) : null,
+            onPressed: () => FavoritesService.instance.toggle(id),
+          );
+        }
+        // Android: solid scrim circle — no glass shader cost in every grid cell.
+        return GestureDetector(
+          onTap: () => FavoritesService.instance.toggle(id),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(
+              color: Color(0x73000000),
+              shape: BoxShape.circle,
+            ),
+            child: Center(child: heart),
           ),
-          size: 38,
-          glowColor: fav ? const Color(0xFFE53935) : null,
-          onPressed: () => FavoritesService.instance.toggle(id),
         );
       },
     );

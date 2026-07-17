@@ -2,6 +2,10 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+    // Firebase: reads google-services.json + uploads R8 mapping.txt for
+    // Crashlytics de-obfuscation. Must come after the Android/Flutter plugins.
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 // Release imzolash kalitlari (android/key.properties — repo'ga kirmaydi).
