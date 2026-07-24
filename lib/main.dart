@@ -1,11 +1,14 @@
 import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:appmetrica_plugin/appmetrica_plugin.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import 'config/app_config.dart';
 import 'firebase_options.dart';
 import 'services/ad_service.dart';
 import 'services/analytics_service.dart';
@@ -26,6 +29,26 @@ Future<void> main() async {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
+  // Yandex AppMetrica — CIS analytics + free install attribution + push. Skipped
+  // when no key is provided (--dart-define=APPMETRICA_API_KEY=...). Crash
+  // reporting stays OFF so Firebase Crashlytics remains the single crash owner
+  // (two native crash handlers would fight over the signal handlers).
+  if (AppConfig.hasAppMetrica) {
+    try {
+      await AppMetrica.activate(
+        AppMetricaConfig(
+          AppConfig.appMetricaApiKey,
+          // Both JVM and native crash reporting off — Firebase Crashlytics is the
+          // single crash owner (two native crash handlers would conflict).
+          crashReporting: false,
+          nativeCrashReporting: false,
+          logs: kDebugMode,
+        ),
+      );
+    } catch (_) {
+      // Analytics init must never block app startup.
+    }
+  }
   // Bound the in-memory image cache so decoding many 4K wallpapers can't OOM.
   PaintingBinding.instance.imageCache.maximumSizeBytes = 100 << 20; // ~100 MB
   // Remove leftover temp download files from earlier runs (fire-and-forget).

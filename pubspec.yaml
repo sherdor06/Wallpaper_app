@@ -49,6 +49,7 @@ dependencies:
   firebase_analytics: ^12.4.4
   firebase_crashlytics: ^5.2.5
   firebase_remote_config: ^6.5.4
+  appmetrica_plugin: ^3.2.0       # Yandex AppMetrica (MDH analitika + atribusiya + push)
 dev_dependencies:
   flutter_test:
     sdk: flutter

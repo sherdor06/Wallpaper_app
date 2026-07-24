@@ -50,6 +50,8 @@ scripts/raw/
 scripts/out/
 scripts/venv/
 scripts/__pycache__/
+scripts/review/
+scripts/.wrangler/
 
 # Android release imzolash kalitlari — HECH QACHON repo'ga qo'shmang
 android/key.properties

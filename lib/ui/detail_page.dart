@@ -1,8 +1,11 @@
+import 'dart:math' show Random;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/wallpaper_repository.dart';
 import '../models/wallpaper.dart';
 import '../services/ad_service.dart';
 import '../services/analytics_service.dart';
@@ -12,6 +15,7 @@ import '../services/remote_config_service.dart';
 import '../services/unlock_service.dart';
 import '../services/wallpaper_service.dart';
 import 'widgets/badges.dart';
+import 'widgets/floating_chrome.dart';
 
 class DetailPage extends StatefulWidget {
   final Wallpaper wallpaper;
@@ -25,6 +29,7 @@ class DetailPage extends StatefulWidget {
 class _DetailPageState extends State<DetailPage> {
   bool _busy = false;
   double _progress = 0;
+  final Random _rng = Random();
 
   /// Immersive preview: tapping the image hides all chrome and the system bars
   /// so the wallpaper is shown full-screen. Tapping again restores them.
@@ -76,7 +81,80 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
+  /// A professional confirmation / info dialog. Returns `true` when the user
+  /// taps the confirm action, and `false` on cancel or dismissal.
+  Future<bool> _confirm({
+    required IconData icon,
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final scheme = Theme.of(context).colorScheme;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        icon: Icon(icon, size: 30, color: scheme.primary),
+        title: Text(title, textAlign: TextAlign.center),
+        content: Text(message, textAlign: TextAlign.center),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  /// Human-readable name of the screen a wallpaper is applied to (Android).
+  static String _targetName(WallpaperTarget target) {
+    switch (target) {
+      case WallpaperTarget.home:
+        return 'Home screen';
+      case WallpaperTarget.lock:
+        return 'Lock screen';
+      case WallpaperTarget.both:
+        return 'Home and Lock screens';
+    }
+  }
+
+  /// Opens a random wallpaper from the catalog, replacing the current page so
+  /// the back stack stays shallow. A gentle cross-fade keeps it polished.
+  Future<void> _openRandom() async {
+    final all = (await WallpaperRepository.instance.fetchCatalog()).wallpapers;
+    if (all.length < 2) return;
+    var next = _w;
+    while (next.id == _w.id) {
+      next = all[_rng.nextInt(all.length)];
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (_, __, ___) => DetailPage(wallpaper: next),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
+    );
+  }
+
   Future<void> _applyImage(WallpaperTarget target) async {
+    // Confirm intent before changing the user's wallpaper (Android).
+    final confirmed = await _confirm(
+      icon: Icons.wallpaper_rounded,
+      title: 'Set as wallpaper?',
+      message:
+          'This will replace your current wallpaper on the ${_targetName(target)}.',
+      confirmLabel: 'Set wallpaper',
+    );
+    if (!confirmed) return;
     final wasLocked = _locked;
     if (!await _ensureUnlocked()) return;
     setState(() {
@@ -130,6 +208,16 @@ class _DetailPageState extends State<DetailPage> {
 
   /// iOS main action: save to Photos + hint how to set it as wallpaper.
   Future<void> _saveToPhotos() async {
+    // iOS can't set the wallpaper directly — explain the download step first.
+    final confirmed = await _confirm(
+      icon: Icons.download_rounded,
+      title: 'Download wallpaper?',
+      message:
+          'This wallpaper will be saved to your Photos. To set it, open Photos, '
+          'tap the Share icon, then choose “Use as Wallpaper”.',
+      confirmLabel: 'Download',
+    );
+    if (!confirmed) return;
     final wasLocked = _locked;
     if (!await _ensureUnlocked()) return;
     setState(() {
@@ -245,6 +333,35 @@ class _DetailPageState extends State<DetailPage> {
                 opacity: _immersive ? 0 : 1,
                 duration: fade,
                 child: _buildControls(),
+              ),
+            ),
+          ),
+
+          // Random-wallpaper button — pinned to a fixed spot so it never shifts
+          // when the panel below changes height between wallpapers (4K hint,
+          // progress bar, live vs image buttons). Thumb-friendly on the right;
+          // liquid glass on iOS, simple solid circle on Android.
+          Positioned(
+            right: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 224,
+            child: IgnorePointer(
+              ignoring: _immersive,
+              child: AnimatedOpacity(
+                opacity: _immersive ? 0 : 1,
+                duration: fade,
+                child: ChromeIconButton(
+                  icon: Icons.shuffle_rounded,
+                  tooltip: 'Random wallpaper',
+                  size: 58,
+                  iconSize: 28,
+                  onTap: () {
+                    if (_busy) return;
+                    // Tactile + audible feedback on press.
+                    HapticFeedback.selectionClick();
+                    SystemSound.play(SystemSoundType.click);
+                    _openRandom();
+                  },
+                ),
               ),
             ),
           ),

@@ -18,7 +18,7 @@ const double kTopChrome = kTopBarHeight + 8;
 /// Floating pill showing the current tab title.
 ///
 /// iOS → liquid glass; Android → solid theme-aware pill (no blur — no jank),
-/// styled like [CircleNavBar].
+/// styled like [CircleNavBar]. Both platforms get the orbiting gradient arc.
 class TitlePill extends StatelessWidget {
   final String text;
 
@@ -34,25 +34,25 @@ class TitlePill extends StatelessWidget {
         color: Theme.of(context).colorScheme.onSurface,
       ),
     );
-    if (!Platform.isAndroid) {
-      // A soft gradient arc slowly orbits the pill's border (iOS only).
-      return _OrbitingGlow(
-        child: GlassContainer(
-          height: kTopBarHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          shape: const LiquidRoundedSuperellipse(borderRadius: 22),
-          alignment: Alignment.center,
-          child: label,
-        ),
-      );
-    }
-    return Container(
-      height: kTopBarHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      alignment: Alignment.center,
-      decoration: _solidDecoration(context, radius: 22),
-      child: label,
-    );
+    // The pill body differs per platform (glass vs solid), but the animated
+    // orbiting arc wraps both so Android matches the iOS motion.
+    final Widget pill = Platform.isAndroid
+        ? Container(
+            height: kTopBarHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            alignment: Alignment.center,
+            decoration: _solidDecoration(context, radius: 22),
+            child: label,
+          )
+        : GlassContainer(
+            height: kTopBarHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            shape: const LiquidRoundedSuperellipse(borderRadius: 22),
+            alignment: Alignment.center,
+            child: label,
+          );
+    // A soft gradient arc slowly orbits the pill's border (both platforms).
+    return _OrbitingGlow(child: pill);
   }
 }
 
@@ -64,33 +64,45 @@ class ChromeIconButton extends StatelessWidget {
   final VoidCallback onTap;
   final String? tooltip;
 
+  /// Diameter of the button. Defaults to the top-bar size; pass a larger value
+  /// for a more prominent, easier-to-tap control (e.g. the detail "random" FAB).
+  final double size;
+
+  /// Glyph size. Defaults to ~half the button so it scales with [size].
+  final double? iconSize;
+
   const ChromeIconButton({
     super.key,
     required this.icon,
     required this.onTap,
     this.tooltip,
+    this.size = kTopBarHeight,
+    this.iconSize,
   });
 
   @override
   Widget build(BuildContext context) {
+    final glyph = iconSize ?? size * 0.5;
     Widget button;
     if (!Platform.isAndroid) {
       button = GlassIconButton(
         icon: Icon(icon),
         onPressed: onTap,
-        size: kTopBarHeight,
+        size: size,
+        iconSize: glyph,
       );
     } else {
       final dark = Theme.of(context).brightness == Brightness.dark;
       button = GestureDetector(
         onTap: onTap,
         child: Container(
-          width: kTopBarHeight,
-          height: kTopBarHeight,
-          decoration: _solidDecoration(context, radius: kTopBarHeight / 2),
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: _solidDecoration(context, radius: size / 2),
           child: Icon(
             icon,
-            size: 22,
+            size: glyph,
             color: dark ? Colors.white70 : Colors.black87,
           ),
         ),
@@ -102,7 +114,8 @@ class ChromeIconButton extends StatelessWidget {
 }
 
 /// Continuously rotating gradient arc ("comet") around its [child] — decorates
-/// the iOS title pill. Respects reduced motion (freezes when animations are off).
+/// the title pill on both platforms. Respects reduced motion (freezes when
+/// animations are off).
 class _OrbitingGlow extends StatefulWidget {
   final Widget child;
 

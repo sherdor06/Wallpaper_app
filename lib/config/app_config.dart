@@ -18,7 +18,10 @@ class AppConfig {
   static final String cdnBaseUrl = _trimSlash(
     const String.fromEnvironment(
       'CDN_BASE_URL',
-      defaultValue: 'https://pub-5fa9490de235468da94d96af1e8dfa7a.r2.dev',
+      // Cloudflare Pages (free, unlimited bandwidth + CDN — no r2.dev throttle).
+      // Deploy new content with: wrangler pages deploy scripts/out
+      //   --project-name=wallpapers-cdn --branch=main
+      defaultValue: 'https://wallpapers-cdn.pages.dev',
     ),
   );
 
@@ -27,6 +30,18 @@ class AppConfig {
 
   /// Whether a remote CDN base URL is configured. If not, the bundled sample is used.
   static bool get hasRemoteCatalog => cdnBaseUrl.isNotEmpty;
+
+  /// Yandex AppMetrica API key (provided at build time). When empty, AppMetrica
+  /// is skipped entirely. Create an app at https://appmetrica.yandex.com and pass
+  /// its key:
+  ///   flutter build apk --dart-define=APPMETRICA_API_KEY=xxxxxxxx-xxxx-xxxx-...
+  static const String appMetricaApiKey = String.fromEnvironment(
+    'APPMETRICA_API_KEY',
+    defaultValue: 'c94e6a6e-c3cc-4482-9e48-0ab8c93f8aa0',
+  );
+
+  /// Whether Yandex AppMetrica is configured (a key was provided).
+  static bool get hasAppMetrica => appMetricaApiKey.isNotEmpty;
 
   static String _trimSlash(String url) =>
       url.endsWith('/') ? url.substring(0, url.length - 1) : url;

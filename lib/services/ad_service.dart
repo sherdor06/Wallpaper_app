@@ -80,7 +80,11 @@ class AdService {
   // UMP flow can be tested from a non-EEA region.
   static const bool _umpTest = bool.fromEnvironment('UMP_TEST');
   static const List<String> _testDeviceIds = [
-    // 'YOUR_DEVICE_HASH',
+    // Samsung Galaxy A17 (dev phone) — always gets TEST ads, even in release, so
+    // the ad UI can be verified/tapped safely without risking invalid clicks.
+    // Other users are unaffected and see real ads. The hash comes from logcat
+    // ("Use ... setTestDeviceIds(...)"); it changes if the advertising ID resets.
+    'A8422E8676D4A81414A8D4978A7B349D',
   ];
 
   /// Banner unit id — real in release, test in debug (per platform).
@@ -109,11 +113,16 @@ class AdService {
     // Initializing the SDK before consent is fine — only ad *requests* need
     // consent. This must stay fast: it blocks app startup (awaited in main()).
     await MobileAds.instance.initialize();
-    if (_testDeviceIds.isNotEmpty) {
-      await MobileAds.instance.updateRequestConfiguration(
-        RequestConfiguration(testDeviceIds: _testDeviceIds),
-      );
-    }
+    // Cap the content rating of served ads app-wide. The stricter of this and
+    // the AdMob dashboard "Ad content rating" wins, so adult/dating ads never
+    // appear even if the dashboard is misconfigured. Category blocking (dating,
+    // gambling, alcohol, …) is dashboard-only — Blocking controls in AdMob.
+    await MobileAds.instance.updateRequestConfiguration(
+      RequestConfiguration(
+        maxAdContentRating: MaxAdContentRating.pg,
+        testDeviceIds: _testDeviceIds,
+      ),
+    );
     _initialized = true;
 
     if (_adsOff) {

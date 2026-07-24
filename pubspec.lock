@@ -17,6 +17,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.3"
+  appmetrica_plugin:
+    dependency: "direct main"
+    description:
+      name: appmetrica_plugin
+      sha256: db5cf3f9369f7601398f2d3edf747bac6edcd7f0ed0a6f7938252208daec06f0
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.4.0"
   archive:
     dependency: transitive
     description:
@@ -153,6 +161,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.0.1"
+  decimal:
+    dependency: transitive
+    description:
+      name: decimal
+      sha256: "4988f89bbbf9de235430300d5ee0e8e87c733a56145dc7d0dd97e6cf90cf809b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.5"
   dio:
     dependency: "direct main"
     description:
@@ -408,6 +424,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.9.1"
+  intl:
+    dependency: transitive
+    description:
+      name: intl
+      sha256: "1ca20c894b1717686a2319b8548763d812bc0aabdac580420a44c5178c57a867"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.20.3"
   jni:
     dependency: transitive
     description:
@@ -704,6 +728,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  rational:
+    dependency: transitive
+    description:
+      name: rational
+      sha256: cb808fb6f1a839e6fc5f7d8cb3b0a10e1db48b3be102de73938c627f0b636336
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.3"
   record_use:
     dependency: transitive
     description:
