@@ -71,6 +71,27 @@ def load_json(path: Path, default):
         return default
 
 
+def save_queue(new_items: list[dict]) -> None:
+    """Persists the queue, merging with whatever is on disk right now.
+
+    review_serve.py writes the same file while the user reviews, so a blind
+    overwrite would revert their keep/skip decisions. Re-read first, keep the
+    on-disk status for items that already exist, and only append the new ones.
+    """
+    on_disk = load_json(QUEUE, {})
+    existing = on_disk.get("items") or [
+        {**it, "status": "pending"} for it in on_disk.get("pending", [])
+    ]
+    by_id = {it["mid"]: it for it in existing}
+    merged = list(existing)
+    for it in new_items:
+        if it["mid"] not in by_id:
+            merged.append(it)
+    QUEUE.parent.mkdir(parents=True, exist_ok=True)
+    QUEUE.write_text(json.dumps({"items": merged}, ensure_ascii=False, indent=2),
+                     encoding="utf-8")
+
+
 def category_for(caption: str) -> str | None:
     for t in TAG_RE.findall(caption or ""):
         cat = TAG_MAP.get(t.lower())
@@ -152,8 +173,8 @@ async def run(per: int, scan: int, only: set[str], face_filter: bool,
         staged[cat] = staged.get(cat, 0) + 1
         # Persist after every download so a dropped connection never loses the
         # queue (Telegram disconnects mid-scan happen; files stay + are recorded).
-        QUEUE.write_text(json.dumps({"items": items}, ensure_ascii=False, indent=2),
-                         encoding="utf-8")
+        # Merges with disk so a concurrent review session isn't reverted.
+        save_queue(items)
         if doc_msg.date:
             dmin = doc_msg.date if dmin is None or doc_msg.date < dmin else dmin
             dmax = doc_msg.date if dmax is None or doc_msg.date > dmax else dmax
@@ -188,8 +209,7 @@ async def run(per: int, scan: int, only: set[str], face_filter: bool,
     await client.disconnect()
 
     REVIEW.mkdir(parents=True, exist_ok=True)
-    QUEUE.write_text(json.dumps({"items": items}, ensure_ascii=False, indent=2),
-                     encoding="utf-8")
+    save_queue(items)
     new_total = sum(staged.values())
     rng = f"  Sanalar: {dmin:%Y-%m-%d} … {dmax:%Y-%m-%d}" if dmin and dmax else ""
     print(f"\nSkaner: {scanned} xabar. Yangi nomzod: {new_total}. "

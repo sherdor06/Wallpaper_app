@@ -37,13 +37,15 @@ class _DetailPageState extends State<DetailPage> {
 
   Wallpaper get _w => widget.wallpaper;
 
-  /// A 4K wallpaper that hasn't been unlocked yet needs a rewarded ad first.
-  /// Skipped entirely when the `rewarded_required_for_4k` Remote Config flag is
-  /// off — then all 4K wallpapers are free to use.
-  bool get _locked =>
-      _w.is4k &&
-      RemoteConfigService.instance.rewardedRequiredFor4k &&
-      !UnlockService.instance.isUnlocked(_w.id);
+  /// A high-resolution wallpaper that hasn't been unlocked yet needs a rewarded
+  /// ad first. Each tier has its own Remote Config flag
+  /// (`rewarded_required_for_4k` / `_fhd`); turning one off makes that tier free.
+  bool get _locked {
+    final rc = RemoteConfigService.instance;
+    final gated = (_w.is4k && rc.rewardedRequiredFor4k) ||
+        (_w.isFhd && rc.rewardedRequiredForFhd);
+    return gated && !UnlockService.instance.isUnlocked(_w.id);
+  }
 
   /// Ensures a 4K wallpaper is unlocked (via a rewarded ad) before proceeding.
   /// Returns true if the action may continue. Grants access when ads are
@@ -57,7 +59,7 @@ class _DetailPageState extends State<DetailPage> {
       if (mounted) setState(() {});
       return true;
     }
-    _snack('Kept locked — watch the short video to unlock 4K');
+    _snack('Kept locked — watch the short video to unlock');
     return false;
   }
 
@@ -455,16 +457,8 @@ class _DetailPageState extends State<DetailPage> {
               ],
             ),
             if (_locked) ...[
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.lock_outline, size: 15, color: Colors.white70),
-                  SizedBox(width: 6),
-                  Text('4K — watch a short video to unlock',
-                      style: TextStyle(color: Colors.white70, fontSize: 12.5)),
-                ],
-              ),
+              const SizedBox(height: 12),
+              _UnlockPill(resolution: _w.resolution),
             ],
             const SizedBox(height: 14),
             if (_busy && _progress > 0 && _progress < 1) ...[
@@ -488,11 +482,26 @@ class _DetailPageState extends State<DetailPage> {
               // iOS can't set the wallpaper programmatically — offer Save to Photos.
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 54,
                 child: FilledButton.icon(
                   onPressed: _busy ? null : _saveToPhotos,
-                  icon: const Icon(Icons.download_rounded),
-                  label: Text(_busy ? 'Saving...' : 'Save to Photos'),
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: _AdBadgedIcon(
+                    icon: Icons.download_rounded,
+                    showBadge: _locked,
+                  ),
+                  label: Text(
+                    _busy
+                        ? 'Saving...'
+                        : _locked
+                            ? 'Save to Photos  (Ad)'
+                            : 'Save to Photos',
+                    style: const TextStyle(
+                        fontSize: 15.5, fontWeight: FontWeight.w600),
+                  ),
                 ),
               )
             else
@@ -503,6 +512,7 @@ class _DetailPageState extends State<DetailPage> {
                       icon: Icons.home_rounded,
                       label: 'Home',
                       primary: true,
+                      locked: _locked,
                       onPressed: _busy ? null : () => _applyImage(WallpaperTarget.home),
                     ),
                   ),
@@ -511,6 +521,7 @@ class _DetailPageState extends State<DetailPage> {
                     child: _ApplyButton(
                       icon: Icons.lock_rounded,
                       label: 'Lock',
+                      locked: _locked,
                       onPressed: _busy ? null : () => _applyImage(WallpaperTarget.lock),
                     ),
                   ),
@@ -519,6 +530,7 @@ class _DetailPageState extends State<DetailPage> {
                     child: _ApplyButton(
                       icon: Icons.smartphone_rounded,
                       label: 'Both',
+                      locked: _locked,
                       onPressed: _busy ? null : () => _applyImage(WallpaperTarget.both),
                     ),
                   ),
@@ -532,10 +544,12 @@ class _DetailPageState extends State<DetailPage> {
 }
 
 /// A wallpaper-apply button. [primary] uses a filled style; others are tonal.
+/// When [locked], a small play badge marks the action as rewarded-ad gated.
 class _ApplyButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool primary;
+  final bool locked;
   final VoidCallback? onPressed;
 
   const _ApplyButton({
@@ -543,24 +557,116 @@ class _ApplyButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.primary = false,
+    this.locked = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final style = FilledButton.styleFrom(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     );
     final child = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 22),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        _AdBadgedIcon(icon: icon, showBadge: locked, size: 22),
+        const SizedBox(height: 5),
+        Text(label,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        if (locked)
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Text('(Ad)',
+                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500)),
+          ),
       ],
     );
     return primary
         ? FilledButton(onPressed: onPressed, style: style, child: child)
         : FilledButton.tonal(onPressed: onPressed, style: style, child: child);
+  }
+}
+
+/// An icon with an optional small "play" badge, marking a rewarded-ad action.
+class _AdBadgedIcon extends StatelessWidget {
+  final IconData icon;
+  final bool showBadge;
+  final double size;
+
+  const _AdBadgedIcon({
+    required this.icon,
+    required this.showBadge,
+    this.size = 21,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (!showBadge) return Icon(icon, size: size);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon, size: size),
+        Positioned(
+          right: -5,
+          top: -3,
+          child: Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              shape: BoxShape.circle,
+              // Ring so the badge reads clearly on any button fill.
+              border: Border.all(color: scheme.onPrimary, width: 1.2),
+            ),
+            child: Icon(Icons.play_arrow_rounded,
+                size: 8.5, color: scheme.onPrimary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Explains that a short rewarded video unlocks this wallpaper — shown above
+/// the action buttons so the cost is clear *before* the user taps.
+class _UnlockPill extends StatelessWidget {
+  final String resolution;
+
+  const _UnlockPill({required this.resolution});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(7, 6, 14, 6),
+      decoration: BoxDecoration(
+        // Dark scrim like [WallpaperBadge] — stays readable over any wallpaper,
+        // light or dark. The accent lives in the play button, not the fill.
+        color: const Color(0xB3000000),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.55)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+            child: Icon(Icons.play_arrow_rounded,
+                size: 14, color: scheme.onPrimary),
+          ),
+          const SizedBox(width: 9),
+          Text(
+            'Watch a short video to unlock $resolution',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

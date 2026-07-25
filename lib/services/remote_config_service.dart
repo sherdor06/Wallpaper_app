@@ -17,6 +17,7 @@ class RemoteConfigService {
   static const _kAdShowEvery = 'ad_show_every';
   static const _kAdMinGapSeconds = 'ad_min_gap_seconds';
   static const _kRewardedRequiredFor4k = 'rewarded_required_for_4k';
+  static const _kRewardedRequiredForFhd = 'rewarded_required_for_fhd';
 
   // Safe defaults (identical to the old constants) — used until/unless the
   // console overrides them.
@@ -24,6 +25,7 @@ class RemoteConfigService {
   static const int _defAdShowEvery = 3;
   static const int _defAdMinGapSeconds = 45;
   static const bool _defRewardedRequiredFor4k = true;
+  static const bool _defRewardedRequiredForFhd = true;
 
   FirebaseRemoteConfig? _rc;
 
@@ -44,6 +46,7 @@ class RemoteConfigService {
         _kAdShowEvery: _defAdShowEvery,
         _kAdMinGapSeconds: _defAdMinGapSeconds,
         _kRewardedRequiredFor4k: _defRewardedRequiredFor4k,
+        _kRewardedRequiredForFhd: _defRewardedRequiredForFhd,
       });
       await rc.fetchAndActivate();
       _rc = rc;
@@ -73,4 +76,9 @@ class RemoteConfigService {
   /// `false` makes all 4K wallpapers free to use.
   bool get rewardedRequiredFor4k =>
       _rc?.getBool(_kRewardedRequiredFor4k) ?? _defRewardedRequiredFor4k;
+
+  /// Same gate for Full-HD wallpapers, so monetization isn't limited to the 4K
+  /// tier. Resolution labels stay accurate — only the gate widens.
+  bool get rewardedRequiredForFhd =>
+      _rc?.getBool(_kRewardedRequiredForFhd) ?? _defRewardedRequiredForFhd;
 }
