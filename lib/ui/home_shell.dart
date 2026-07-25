@@ -4,6 +4,7 @@ import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/material.dart';
 
 import '../services/favorites_service.dart';
+import 'archive_page.dart';
 import 'favorites_tab.dart';
 import 'home_tab.dart';
 import 'search_tab.dart';
@@ -83,6 +84,15 @@ class _HomeShellState extends State<HomeShell> {
                       children: [
                         TitlePill(text: _titles[_index]),
                         const Spacer(),
+                        ChromeIconButton(
+                          icon: Icons.inventory_2_outlined,
+                          tooltip: 'Archive',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const ArchivePage()),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         ChromeIconButton(
                           icon: Icons.settings_outlined,
                           tooltip: 'Settings',

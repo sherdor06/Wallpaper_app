@@ -13,6 +13,7 @@ import 'firebase_options.dart';
 import 'services/ad_service.dart';
 import 'services/analytics_service.dart';
 import 'services/favorites_service.dart';
+import 'services/history_service.dart';
 import 'services/remote_config_service.dart';
 import 'services/theme_service.dart';
 import 'services/unlock_service.dart';
@@ -65,6 +66,7 @@ Future<void> main() async {
   await AdService.instance.init();
   // Load favorites + unlocked (4K) wallpapers + theme choice from disk.
   await FavoritesService.instance.init();
+  await HistoryService.instance.init();
   await UnlockService.instance.init();
   await ThemeService.instance.init();
   runApp(const WallpaperApp());

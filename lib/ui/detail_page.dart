@@ -10,6 +10,7 @@ import '../models/wallpaper.dart';
 import '../services/ad_service.dart';
 import '../services/analytics_service.dart';
 import '../services/favorites_service.dart';
+import '../services/history_service.dart';
 import '../services/image_cache.dart';
 import '../services/remote_config_service.dart';
 import '../services/unlock_service.dart';
@@ -172,6 +173,7 @@ class _DetailPageState extends State<DetailPage> {
         },
       );
       AnalyticsService.logWallpaperSet(_w.id, target: target.value);
+      HistoryService.instance.add(_w.id);
       // Interstitial after apply — but not right after a rewarded (no double ad).
       if (!wasLocked) await AdService.instance.maybeShowInterstitial();
       _snack('Wallpaper set (${target.value})');
@@ -199,6 +201,7 @@ class _DetailPageState extends State<DetailPage> {
         },
       );
       AnalyticsService.logWallpaperDownload(_w.id);
+      HistoryService.instance.add(_w.id);
       if (!wasLocked) await AdService.instance.maybeShowInterstitial();
       _snack('Saved to gallery');
     } catch (_) {
@@ -234,6 +237,7 @@ class _DetailPageState extends State<DetailPage> {
         },
       );
       AnalyticsService.logWallpaperDownload(_w.id);
+      HistoryService.instance.add(_w.id);
       if (!wasLocked) await AdService.instance.maybeShowInterstitial();
       _snack('Saved! Open Photos → Share → Use as Wallpaper');
     } on PlatformException catch (e) {
@@ -262,6 +266,7 @@ class _DetailPageState extends State<DetailPage> {
         },
       );
       AnalyticsService.logWallpaperSet(_w.id, target: 'live');
+      HistoryService.instance.add(_w.id);
       // The system live-wallpaper preview opens; the user confirms there.
       _snack('Tap "Set wallpaper" in the preview');
     } on PlatformException catch (e) {
