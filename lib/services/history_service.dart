@@ -56,6 +56,17 @@ class HistoryService extends ChangeNotifier {
     await _save();
   }
 
+  /// Removes the given ids — the Archive screen's multi-select delete.
+  Future<void> removeAll(Iterable<String> ids) async {
+    final gone = ids.toSet();
+    if (gone.isEmpty) return;
+    final before = _ids.length;
+    _ids.removeWhere(gone.contains);
+    if (_ids.length == before) return;
+    notifyListeners();
+    await _save();
+  }
+
   /// Empties the history (the Archive screen's "Clear" action).
   Future<void> clear() async {
     if (_ids.isEmpty) return;

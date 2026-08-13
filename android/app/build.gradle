@@ -60,4 +60,15 @@ android {
     }
 }
 
+dependencies {
+    // Mediated networks for AppLovin MAX. Each adapter bundles the network's own
+    // SDK; MAX loads whichever ones the dashboard has enabled, so adding an
+    // adapter here without switching the network on in the dashboard does
+    // nothing but add weight.
+    //
+    // Yandex first because it carries this app's CIS audience — MAX's own
+    // demand is thin there, and that region is where most installs land.
+    implementation "com.applovin.mediation:yandex-adapter:7.18.5.0"
+}
+
 flutter { source = "../.." }

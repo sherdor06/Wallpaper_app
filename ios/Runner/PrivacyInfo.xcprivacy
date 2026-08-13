@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  App-level privacy manifest.
+
+  Scope: this file covers the Runner target only. Every SDK ships its own
+  manifest and Xcode merges them at build time — Flutter.framework declares the
+  engine's file-timestamp and boot-time use, and the 42 pods (AdMob, Firebase,
+  AppMetrica, …) declare theirs. So NSPrivacyAccessedAPITypes is empty here:
+  the app's own Swift (AppDelegate's PhotoKit save and `fileExists`) touches no
+  required-reason API.
+
+  What this file is really for is the two things only the app can answer —
+  whether it tracks, and what it collects.
+-->
+<plist version="1.0">
+<dict>
+  <!-- True because AdMob serves personalised ads and AppMetrica does install
+       attribution. This is the declaration that must match the ATT prompt in
+       AdService._requestTrackingAuthorization(); claiming tracking without ever
+       asking, or asking without declaring, is a review rejection either way. -->
+  <key>NSPrivacyTracking</key>
+  <true/>
+
+  <!-- iOS blocks these hosts outright when the user denies ATT, so the list has
+       to be the domains that actually carry tracking data and nothing more.
+       Ad serving and attribution are listed; crash reporting and Remote Config
+       are not, since they identify no one across apps.
+
+       Google's ad domains are gone with AdMob — these are AppLovin MAX, the
+       Yandex network mediated inside it, and AppMetrica for attribution. If
+       another network is switched on in the MAX dashboard, its domains belong
+       here too, or ATT denial will not actually stop its tracking. -->
+  <key>NSPrivacyTrackingDomains</key>
+  <array>
+    <string>ms.applovin.com</string>
+    <string>rt.applovin.com</string>
+    <string>prod-a.applovin.com</string>
+    <string>ad.mail.ru</string>
+    <string>mobile.yandexadexchange.net</string>
+    <string>report.appmetrica.yandex.net</string>
+    <string>startup.mobile.yandex.net</string>
+    <string>app-measurement.com</string>
+  </array>
+
+  <key>NSPrivacyCollectedDataTypes</key>
+  <array>
+    <!-- IDFA/IDFV via AdMob and AppMetrica. Linked to the user and used for
+         tracking — this is the entry ATT actually gates. -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeDeviceID</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+      </array>
+    </dict>
+
+    <!-- Which wallpapers get opened, favourited and applied — Firebase
+         Analytics and AppMetrica events. -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+
+    <!-- Impressions and rewarded completions reported back to AdMob. -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeAdvertisingData</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
+      </array>
+    </dict>
+
+    <!-- Firebase Crashlytics. Not tracking: it never leaves the app's own
+         diagnostics and identifies no one across apps. -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeCrashData</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+  </array>
+
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array/>
+</dict>
+</plist>

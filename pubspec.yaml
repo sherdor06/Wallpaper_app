@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.9.2
@@ -39,8 +39,7 @@ dependencies:
   path_provider: ^2.1.3           # fayl yo'li
   permission_handler: ^11.3.1     # (ixtiyoriy) ruxsatlar
   liquid_glass_widgets: ^0.19.1   # liquid glass UI (chrome + widgetlar)
-  cupertino_native: ^0.0.1        # iOS native Liquid Glass tab bar (CNTabBar)
-  google_mobile_ads: ^5.2.0       # AdMob reklama (banner + interstitial)
+  cupertino_native_better: ^1.5.2  # iOS native Liquid Glass (tab bar, glass menus/buttons)
   lottie: ^3.1.0                  # Lottie animatsiyalar (loading/splash/empty)
   url_launcher: ^6.3.0            # tashqi havolalar (privacy, rate, email)
   flutter_cache_manager: ^3.4.1  # keshni tozalash (Settings)
@@ -49,7 +48,15 @@ dependencies:
   firebase_analytics: ^12.4.4
   firebase_crashlytics: ^5.2.5
   firebase_remote_config: ^6.5.4
-  appmetrica_plugin: ^3.2.0       # Yandex AppMetrica (MDH analitika + atribusiya + push)
+  # Pinned exactly, not a caret range. AppMetrica and the Yandex ad network both
+  # depend on AppMetricaLibraryAdapter, and their allowed ranges only overlap on
+  # 6.5.x: the AppLovin Yandex adapter asks for `~> 6.5.0` (< 6.6), while
+  # appmetrica_plugin 4.1.0 raised its floor to `~> 6.6`. Any caret range here
+  # resolves to 4.1.0 and CocoaPods then refuses to install at all.
+  # Before bumping this, check the adapter's podspec in ios/Podfile.
+  appmetrica_plugin: 4.0.0        # Yandex AppMetrica (MDH analitika + atribusiya + push)
+  app_tracking_transparency: ^2.0.7
+  applovin_max: ^4.6.4
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -69,7 +76,10 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icon/icon.png"
   remove_alpha_ios: true
-  adaptive_icon_background: "#5A48DB"
+  # Gradient image, not a flat colour: the icon's glass panel is a full-bleed
+  # layer, and it must sit on the background (the foreground is parallax-shifted
+  # by the launcher, so anything full-bleed there would slide out of register).
+  adaptive_icon_background: "assets/icon/icon_background.png"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"
 
 # Splash konfiguratsiyasi: `dart run flutter_native_splash:create`
@@ -78,7 +88,11 @@ flutter_native_splash:
   image: "assets/icon/splash.png"
   android_12:
     color: "#0E0E12"
-    image: "assets/icon/splash.png"
+    # Android 12+ draws this itself and masks it to a circle, so it needs its
+    # own asset: a 1152px canvas with the artwork inside the centre 768px circle
+    # (the platform's 288dp/192dp pair). Reusing the full-bleed splash.png here
+    # puts content across 100% of the canvas and the mask cuts through the glyph.
+    image: "assets/icon/android12_splash.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

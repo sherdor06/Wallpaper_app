@@ -31,6 +31,22 @@ target 'Runner' do
   use_frameworks!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Mediated networks for AppLovin MAX. Each adapter bundles the network's own
+  # SDK; MAX loads whichever ones the dashboard has enabled, so adding an
+  # adapter here without switching the network on in the dashboard does nothing
+  # but add weight.
+  #
+  # Yandex first because it carries this app's CIS audience -- MAX's own demand
+  # is thin there, and that region is where most installs land.
+  #
+  # The version deliberately does NOT match the Android adapter: the two track
+  # their own platform's Yandex SDK and are numbered independently. Android is on
+  # the 7.18.x line, iOS jumped to 8.x, and there is no 7.18.5 pod at all -- that
+  # mismatch is what broke `pod install`. Check the adapter's own podspec before
+  # bumping either side.
+  pod 'AppLovinMediationYandexAdapter', '~> 8.3.0'
+
   target 'RunnerTests' do
     inherit! :search_paths
   end

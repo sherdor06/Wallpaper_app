@@ -28,7 +28,11 @@ class _FavoritesTabState extends State<FavoritesTab> {
 
   Future<void> _refresh() async {
     final f = WallpaperRepository.instance.fetchCatalog(forceRefresh: true);
-    setState(() => _future = f);
+    // Block body so the closure returns void: an arrow would return the
+    // assigned Future, which setState asserts against.
+    setState(() {
+      _future = f;
+    });
     await f;
   }
 

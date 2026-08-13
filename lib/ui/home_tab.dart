@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../data/wallpaper_repository.dart';
@@ -131,15 +132,36 @@ class _CategoryBar extends StatefulWidget {
   State<_CategoryBar> createState() => _CategoryBarState();
 }
 
-class _CategoryBarState extends State<_CategoryBar> {
+class _CategoryBarState extends State<_CategoryBar>
+    with SingleTickerProviderStateMixin {
   final ScrollController _scroll = ScrollController();
-  bool _autoOn = false;
-  bool _looping = false;
   Timer? _resumeTimer;
+
+  /// Drives the drift. A ticker moves the offset by however far the elapsed
+  /// frame time is worth, so the speed is identical on 60Hz and 120Hz displays
+  /// and stays constant end to end.
+  ///
+  /// The previous implementation chained `animateTo` calls with an easing curve,
+  /// which visibly accelerated and braked over its 40-second span and inserted a
+  /// pause at every hand-off. Constant velocity is what reads as "moving on its
+  /// own" rather than "being animated".
+  late final Ticker _ticker;
+  Duration _lastTick = Duration.zero;
+
+  /// +1 drifting right, -1 drifting back. Reversal is eased by [_turnaround] so
+  /// the direction change is not an instant flip.
+  double _direction = 1;
+
+  /// Seconds of easing applied either side of a reversal.
+  static const _turnaround = 0.6;
+  static const _pixelsPerSecond = 26.0;
+
+  double _reverseEase = 1;
 
   @override
   void initState() {
     super.initState();
+    _ticker = createTicker(_onTick);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStart());
   }
 
@@ -154,34 +176,49 @@ class _CategoryBarState extends State<_CategoryBar> {
 
   void _maybeStart() {
     if (!mounted || MediaQuery.of(context).disableAnimations) return;
-    _autoOn = true;
-    _runLoop();
+    if (_ticker.isActive) return;
+    _lastTick = Duration.zero;
+    _ticker.start();
   }
 
-  /// Ping-pong the scroll offset end-to-end at a slow, steady speed.
-  Future<void> _runLoop() async {
-    if (_looping) return;
-    _looping = true;
-    while (mounted && _autoOn && _scroll.hasClients) {
-      final max = _scroll.position.maxScrollExtent;
-      if (max <= 0) break; // everything fits — nothing to scroll
-      final target = _scroll.offset < max / 2 ? max : 0.0;
-      final ms = ((target - _scroll.offset).abs() / 28 * 1000)
-          .clamp(2000, 40000)
-          .toInt(); // ~28 px/s
-      await _scroll.animateTo(
-        target,
-        duration: Duration(milliseconds: ms),
-        curve: Curves.easeInOut,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 600));
+  void _stop() {
+    if (_ticker.isActive) _ticker.stop();
+  }
+
+  void _onTick(Duration elapsed) {
+    if (!_scroll.hasClients) return;
+    final max = _scroll.position.maxScrollExtent;
+    if (max <= 0) return; // everything fits — nothing to scroll
+
+    // First frame only establishes the baseline; moving by `elapsed` itself
+    // would jump the row forward by however long the ticker has been alive.
+    final dt = _lastTick == Duration.zero
+        ? 0.0
+        : (elapsed - _lastTick).inMicroseconds / 1e6;
+    _lastTick = elapsed;
+    if (dt <= 0) return;
+
+    // Ease the last stretch before each end so the reversal is a slow turn
+    // rather than a bounce.
+    final toEdge = _direction > 0 ? max - _scroll.offset : _scroll.offset;
+    final easeSpan = _pixelsPerSecond * _turnaround;
+    _reverseEase = easeSpan <= 0 ? 1 : (toEdge / easeSpan).clamp(0.15, 1.0);
+
+    var next = _scroll.offset + _direction * _pixelsPerSecond * _reverseEase * dt;
+    if (next >= max) {
+      next = max;
+      _direction = -1;
+    } else if (next <= 0) {
+      next = 0;
+      _direction = 1;
     }
-    _looping = false;
+    _scroll.jumpTo(next);
   }
 
   @override
   void dispose() {
     _resumeTimer?.cancel();
+    _ticker.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -207,14 +244,20 @@ class _CategoryBarState extends State<_CategoryBar> {
           Expanded(
             child: Listener(
               onPointerDown: (_) {
-                _autoOn = false;
                 _resumeTimer?.cancel();
-                // Stop the in-flight marquee instantly so THIS tap lands on a
-                // chip. Otherwise the moving list wins the gesture arena and the
-                // first tap only halts the scroll (selection needs a 2nd tap).
-                if (_scroll.hasClients) _scroll.jumpTo(_scroll.offset);
+                // Stopping the ticker is enough to freeze the row: the drift is
+                // a series of jumpTo calls, not an animation the ListView owns,
+                // so there is no scroll activity competing for the gesture. The
+                // old code had to jumpTo here to cancel an in-flight animateTo,
+                // which is why the first tap only halted the marquee and
+                // selecting a chip took two taps.
+                _stop();
               },
               onPointerUp: (_) {
+                _resumeTimer?.cancel();
+                _resumeTimer = Timer(const Duration(seconds: 3), _maybeStart);
+              },
+              onPointerCancel: (_) {
                 _resumeTimer?.cancel();
                 _resumeTimer = Timer(const Duration(seconds: 3), _maybeStart);
               },

@@ -32,6 +32,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+# Gradle writes here too; only the root /build/ was ignored, so this
+# directory kept showing up as untracked.
+android/build/
 
 # Symbolication related
 app.*.symbols

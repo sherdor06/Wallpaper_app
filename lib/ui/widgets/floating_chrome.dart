@@ -7,6 +7,20 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 const _accent = Color(0xFF6C5CE7);
 const _accentLight = Color(0xFF8E7BF5);
 
+/// True on iOS 26+, where the native Liquid Glass controls (tab bar, popup
+/// menus) are available. [Platform.operatingSystemVersion] is a free-form
+/// string, so parse defensively.
+bool get isIOS26OrAbove {
+  if (!Platform.isIOS) return false;
+  try {
+    final match = RegExp(r'(\d+)').firstMatch(Platform.operatingSystemVersion);
+    if (match == null) return false;
+    return int.parse(match.group(1)!) >= 26;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Height of the floating top-bar pills (title + settings button).
 const double kTopBarHeight = 44;
 

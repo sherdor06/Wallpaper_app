@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 
@@ -62,8 +63,13 @@ Future<void> main() async {
   }
   // Remote Config first — AdService reads the ad kill switch / frequency from it.
   await RemoteConfigService.instance.init();
-  // Initialize AdMob and gather UMP (GDPR) consent before any ads load.
-  await AdService.instance.init();
+  // AdMob init + UMP consent — deliberately NOT awaited. Nothing on screen
+  // needs it: the banner awaits [AdService.adsAllowed] itself, and every
+  // interstitial/rewarded path is guarded until consent resolves. Awaiting it
+  // would put the whole ad stack on the cold-start critical path — cheap today
+  // with AdMob alone, but seconds once mediation adapters are added, since each
+  // adapter initializes inside MobileAds.initialize().
+  unawaited(AdService.instance.init());
   // Load favorites + unlocked (4K) wallpapers + theme choice from disk.
   await FavoritesService.instance.init();
   await HistoryService.instance.init();

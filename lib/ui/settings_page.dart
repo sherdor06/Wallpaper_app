@@ -10,8 +10,11 @@ import '../services/theme_service.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
-  static const _privacyUrl =
-      'https://pub-5fa9490de235468da94d96af1e8dfa7a.r2.dev/privacy_policy.html';
+  /// Served from the Pages CDN, not the old r2.dev bucket: R2 is a paid add-on
+  /// that gets deactivated if the Cloudflare bill lapses, and a dead privacy
+  /// policy URL is a store-compliance failure. Pages is on the free tier and is
+  /// already where the app reads its catalog from.
+  static const _privacyUrl = 'https://wallpapers-cdn.pages.dev/privacy';
   static const _storeUrl =
       'https://play.google.com/store/apps/details?id=com.sherdor.wallpapers';
   static const _contactEmail = 'sherdor0605@gmail.com';
@@ -93,7 +96,7 @@ class SettingsPage extends StatelessWidget {
             onTap: () => _open(Uri(
               scheme: 'mailto',
               path: _contactEmail,
-              query: 'subject=Wallpapers 4K feedback',
+              query: 'subject=Wavely feedback',
             )),
           ),
           const Divider(height: 0),
@@ -104,7 +107,7 @@ class SettingsPage extends StatelessWidget {
               final version = snapshot.data?.version;
               return ListTile(
                 leading: const Icon(Icons.info_outline),
-                title: const Text('Wallpapers 4K — Free'),
+                title: const Text('Wavely'),
                 subtitle: Text(version == null ? '' : 'Version $version'),
               );
             },

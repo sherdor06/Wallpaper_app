@@ -6,7 +6,23 @@ import '../../models/wallpaper.dart';
 import '../detail_page.dart';
 import 'wallpaper_tile.dart';
 
-/// Reusable wallpaper grid shared by the Home, Favorites and Search screens.
+/// Number of columns for a grid [width] wide, chosen so each tile lands near
+/// [target] logical pixels across.
+///
+/// The layout was drawn for a phone — two columns of roughly 190px. Hard-coding
+/// that count makes a 10" tablet show two enormous tiles instead of more of the
+/// catalog, so the count is derived from the width and the *tile* size is what
+/// stays constant. Clamped at both ends: one column reads as broken, and past
+/// six a thumbnail is too small to judge a wallpaper by.
+int gridColumnsFor(
+  double width, {
+  double target = 190,
+  int min = 2,
+  int max = 6,
+}) =>
+    (width / target).round().clamp(min, max);
+
+/// Reusable wallpaper grid shared by the Home and Favorites screens.
 ///
 /// Takes an already-filtered list and opens the detail page on tap.
 /// Provide [onRefresh] to enable pull-to-refresh.
@@ -47,29 +63,41 @@ class WallpaperGrid extends StatelessWidget {
                   width: 160,
                   height: 160,
                   repeat: true,
+                  // The empty state must never be the thing that breaks; a
+                  // missing asset falls back to a plain icon.
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 72,
+                    color: Colors.white24,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
               Center(child: Text(emptyText, style: const TextStyle(color: Colors.white54))),
             ],
           )
-        : MasonryGridView.count(
-            // Top inset clears the translucent app bar; extra bottom padding so
-            // the last row clears the floating nav + ad (extendBody adds the
-            // bottom bar height to MediaQuery padding).
-            padding: EdgeInsets.fromLTRB(
-                8, topPadding, 8, 8 + MediaQuery.of(context).padding.bottom),
-            crossAxisCount: 2,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final w = items[index];
-              return WallpaperTile(
-                wallpaper: w,
-                onTap: () => _open(context, w),
-              );
-            },
+        : LayoutBuilder(
+            // Measures the grid itself rather than the window: this sits inside
+            // the shell's padding, and on a tablet the difference is a whole
+            // column.
+            builder: (context, constraints) => MasonryGridView.count(
+              // Top inset clears the translucent app bar; extra bottom padding
+              // so the last row clears the floating nav + ad (extendBody adds
+              // the bottom bar height to MediaQuery padding).
+              padding: EdgeInsets.fromLTRB(
+                  8, topPadding, 8, 8 + MediaQuery.of(context).padding.bottom),
+              crossAxisCount: gridColumnsFor(constraints.maxWidth),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final w = items[index];
+                return WallpaperTile(
+                  wallpaper: w,
+                  onTap: () => _open(context, w),
+                );
+              },
+            ),
           );
 
     if (onRefresh == null) return child;

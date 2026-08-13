@@ -1,32 +1,34 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
+import 'package:applovin_max/applovin_max.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'analytics_service.dart';
 import 'remote_config_service.dart';
 
-/// Manages AdMob ads (banner + interstitial). Ads are the only monetization —
-/// there is no premium/ad-free tier, so ads are always shown.
+/// Manages ads through AppLovin MAX, with Yandex mediated inside it. Ads are the
+/// only monetization — there is no premium/ad-free tier, so ads are always shown.
 ///
-/// Real AdMob unit IDs are used only in RELEASE builds; DEBUG builds use Google's
-/// official TEST units. This protects the AdMob account from "invalid clicks"
-/// during development (tapping your own live ads can get the account banned).
-/// The real App IDs live in AndroidManifest.xml / Info.plist (used in all builds).
+/// MAX is a mediation layer, not just a network: Yandex, Unity, Mintegral and
+/// others bid through it and are configured in the MAX dashboard rather than in
+/// this file. That matters here because the CIS audience this app serves is
+/// where Yandex's demand is strongest, while MAX covers everywhere else — and if
+/// AdMob is ever reinstated it becomes one more network in the same auction,
+/// with no code change.
 ///
-/// Before any ad is requested, UMP (Google's User Messaging Platform) gathers
-/// GDPR consent for EEA/UK users. Ads only load once [adsAllowed] resolves to
-/// `true` — required by AdMob policy for personalized ads in the EEA.
+/// The public surface (`adsAllowed`, [bannerUnitId], [maybeShowInterstitial],
+/// [maybeShowInterstitialOnBrowse], [showRewardedToUnlock]) is unchanged from
+/// the AdMob implementation, so the UI never learns which network is behind it.
 class AdService {
   AdService._();
   static final AdService instance = AdService._();
 
   /// When true, no ads are shown (banner hidden, interstitials skipped).
   ///
-  /// Ads are shown by default in every build — debug/profile use Google's TEST
-  /// unit ids (see below), so showing them is safe. For clean store screenshots
-  /// hide them with `--dart-define=HIDE_ADS=true`.
+  /// Ads are shown by default in every build. For clean store screenshots hide
+  /// them with `--dart-define=HIDE_ADS=true`.
   static const bool adsHidden =
       bool.fromEnvironment('HIDE_ADS', defaultValue: false);
 
@@ -34,232 +36,243 @@ class AdService {
   /// [adsHidden] flag, or the `ads_enabled` Remote Config kill switch is off.
   bool get _adsOff => adsHidden || !RemoteConfigService.instance.adsEnabled;
 
-  InterstitialAd? _interstitial;
-  RewardedAd? _rewarded;
   bool _initialized = false;
-
-  // Whether gathered consent allows requesting ads. Stays false until UMP
-  // consent has been resolved (or true immediately for users outside the EEA).
   bool _canRequestAds = false;
   final Completer<bool> _adsAllowed = Completer<bool>();
 
-  /// Resolves once ad consent has been gathered — `true` if ads may be
-  /// requested. Ad widgets (e.g. the banner) await this before loading.
+  /// Resolves once the SDK is up and consent has been gathered — `true` if ads
+  /// may be requested. Ad widgets (e.g. the banner) await this before loading.
   Future<bool> get adsAllowed => _adsAllowed.future;
 
-  // Frequency cap: show an interstitial at most every [_showEvery] actions and
-  // never more often than [_minGap]. Both come from Remote Config (with safe
-  // defaults) so they can be tuned from the console without an app update.
+  // --- Frequency caps -------------------------------------------------------
+  // Interstitials have two independent triggers:
+  //   • value moments — a wallpaper was applied/saved → every [_showEvery]
+  //   • browse steps  — the user shuffled to another wallpaper → [_browseEvery]
+  // Separate counters because browsing is far more frequent than applying.
+  //
+  // Both share ONE cooldown, and every full-screen ad — rewarded included —
+  // refreshes it (see [_noteFullScreenShown]). That is what makes it safe to
+  // request an interstitial right after a rewarded unlock: the gap swallows it
+  // instead of stacking two full-screen ads on one tap.
   int get _showEvery => RemoteConfigService.instance.adShowEvery;
+  int get _browseEvery => RemoteConfigService.instance.adBrowseEvery;
   Duration get _minGap =>
       Duration(seconds: RemoteConfigService.instance.adMinGapSeconds);
   int _actionCount = 0;
-  DateTime _lastShown = DateTime.fromMillisecondsSinceEpoch(0);
+  int _browseCount = 0;
+  DateTime _lastFullScreen = DateTime.fromMillisecondsSinceEpoch(0);
 
-  // --- Real AdMob unit IDs (release only) ---
-  static const _bannerIosReal = 'ca-app-pub-8510304338648685/3349592764';
-  static const _bannerAndroidReal = 'ca-app-pub-8510304338648685/8027204377';
-  static const _interstitialIosReal = 'ca-app-pub-8510304338648685/3166558696';
-  static const _interstitialAndroidReal = 'ca-app-pub-8510304338648685/3561345758';
-  // Rewarded (4K unlock) — real AdMob unit ids (per app / platform).
-  static const _rewardedIosReal = 'ca-app-pub-8510304338648685/7828949747';
-  static const _rewardedAndroidReal = 'ca-app-pub-8510304338648685/5475651512';
+  // --- Credentials ----------------------------------------------------------
+  // TODO(sherdor): fill these in from the AppLovin dashboard before shipping.
+  // The SDK key is under Account → Keys; the unit ids under MAX → Ad Units,
+  // created separately per platform. Yandex is switched on inside the dashboard
+  // (MAX → Networks → Yandex) — it needs no ids here.
+  static const _sdkKey = String.fromEnvironment('APPLOVIN_SDK_KEY',
+      defaultValue: 'YOUR_APPLOVIN_SDK_KEY');
 
-  // --- Google test unit IDs (debug) ---
-  static const _bannerIosTest = 'ca-app-pub-3940256099942544/2934735716';
-  static const _bannerAndroidTest = 'ca-app-pub-3940256099942544/6300978111';
-  static const _interstitialIosTest = 'ca-app-pub-3940256099942544/4411468910';
-  static const _interstitialAndroidTest = 'ca-app-pub-3940256099942544/1033173712';
-  static const _rewardedIosTest = 'ca-app-pub-3940256099942544/1712485313';
-  static const _rewardedAndroidTest = 'ca-app-pub-3940256099942544/5224354917';
+  static const _bannerAndroid = 'YOUR_ANDROID_BANNER_UNIT_ID';
+  static const _bannerIos = 'YOUR_IOS_BANNER_UNIT_ID';
+  static const _interstitialAndroid = 'YOUR_ANDROID_INTERSTITIAL_UNIT_ID';
+  static const _interstitialIos = 'YOUR_IOS_INTERSTITIAL_UNIT_ID';
+  static const _rewardedAndroid = 'YOUR_ANDROID_REWARDED_UNIT_ID';
+  static const _rewardedIos = 'YOUR_IOS_REWARDED_UNIT_ID';
 
-  // Your physical test device's hashed id — printed to the console the first time
-  // an ad is requested ("Use RequestConfiguration...setTestDeviceIds(...)"). When
-  // set, real devices get test ads (no invalid-click risk); with
-  // `--dart-define=UMP_TEST=true` it also forces the EEA consent geography so the
-  // UMP flow can be tested from a non-EEA region.
-  static const bool _umpTest = bool.fromEnvironment('UMP_TEST');
+  /// True while the credentials above are still placeholders. Everything stays
+  /// switched off in that state rather than firing requests that can only fail
+  /// — a stream of malformed requests is exactly the pattern networks flag.
+  static bool get _credentialsMissing =>
+      _sdkKey.startsWith('YOUR_') || _bannerAndroid.startsWith('YOUR_');
+
+  /// Devices that must never see live ads.
+  ///
+  /// MAX has no debug/live split in the unit ids the way AdMob did, so this is
+  /// the only thing standing between a development tap and an invalid-activity
+  /// flag on the account. These are Google Advertising IDs (Android) / IDFAs
+  /// (iOS) — read them from the device's own logs on first launch, or from
+  /// Settings → Google → Ads on Android.
   static const List<String> _testDeviceIds = [
-    // Samsung Galaxy A17 (dev phone) — always gets TEST ads, even in release, so
-    // the ad UI can be verified/tapped safely without risking invalid clicks.
-    // Other users are unaffected and see real ads. The hash comes from logcat
-    // ("Use ... setTestDeviceIds(...)"); it changes if the advertising ID resets.
-    'A8422E8676D4A81414A8D4978A7B349D',
+    // Samsung Galaxy A17 (dev phone) — replace with its advertising ID.
+    // 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
   ];
 
-  /// Banner unit id — real in release, test in debug (per platform).
-  String get bannerUnitId {
-    if (kReleaseMode) return Platform.isIOS ? _bannerIosReal : _bannerAndroidReal;
-    return Platform.isIOS ? _bannerIosTest : _bannerAndroidTest;
-  }
+  String get bannerUnitId => Platform.isIOS ? _bannerIos : _bannerAndroid;
+  String get _interstitialUnitId =>
+      Platform.isIOS ? _interstitialIos : _interstitialAndroid;
+  String get _rewardedUnitId =>
+      Platform.isIOS ? _rewardedIos : _rewardedAndroid;
 
-  /// Interstitial unit id — real in release, test in debug (per platform).
-  String get _interstitialUnitId {
-    if (kReleaseMode) {
-      return Platform.isIOS ? _interstitialIosReal : _interstitialAndroidReal;
-    }
-    return Platform.isIOS ? _interstitialIosTest : _interstitialAndroidTest;
-  }
+  // --- Rewarded state -------------------------------------------------------
+  // MAX reports through listeners rather than per-ad objects, so the result of
+  // a show has to be carried between callbacks.
+  Completer<bool>? _rewardCompleter;
+  bool _rewardEarned = false;
+  Timer? _rewardTimeout;
 
-  /// Rewarded unit id — real in release, test in debug (per platform).
-  String get _rewardedUnitId {
-    if (kReleaseMode) {
-      return Platform.isIOS ? _rewardedIosReal : _rewardedAndroidReal;
-    }
-    return Platform.isIOS ? _rewardedIosTest : _rewardedAndroidTest;
-  }
+  /// Ceiling on how long a rewarded show may stay unresolved.
+  ///
+  /// The result arrives through `onAdHidden` / `onAdDisplayFailed`. If neither
+  /// ever fires — an SDK edge case, or the process being backgrounded at the
+  /// wrong moment — the awaiting caller would hang and the save button would sit
+  /// in its "Playing" state for the rest of the session. Generous enough that no
+  /// real ad reaches it.
+  static const _rewardTimeoutAfter = Duration(minutes: 3);
 
   Future<void> init() async {
-    // Initializing the SDK before consent is fine — only ad *requests* need
-    // consent. This must stay fast: it blocks app startup (awaited in main()).
-    await MobileAds.instance.initialize();
-    // Cap the content rating of served ads app-wide. The stricter of this and
-    // the AdMob dashboard "Ad content rating" wins, so adult/dating ads never
-    // appear even if the dashboard is misconfigured. Category blocking (dating,
-    // gambling, alcohol, …) is dashboard-only — Blocking controls in AdMob.
-    await MobileAds.instance.updateRequestConfiguration(
-      RequestConfiguration(
-        maxAdContentRating: MaxAdContentRating.pg,
-        testDeviceIds: _testDeviceIds,
-      ),
-    );
-    _initialized = true;
-
-    if (_adsOff) {
-      // Ads disabled (HIDE_ADS build or the Remote Config kill switch) — skip
-      // consent + loading entirely.
+    if (_adsOff || _credentialsMissing) {
       if (!_adsAllowed.isCompleted) _adsAllowed.complete(false);
       return;
     }
-    _gatherConsent();
-  }
 
-  /// Requests the latest UMP consent info and shows the consent form if
-  /// required, then enables ad loading. Fire-and-forget: the SDK shows the form
-  /// once the UI is up, so this must not block startup.
-  void _gatherConsent() {
-    final params = ConsentRequestParameters(
-      consentDebugSettings: _umpTest
-          ? ConsentDebugSettings(
-              debugGeography: DebugGeography.debugGeographyEea,
-              testIdentifiers: _testDeviceIds,
-            )
-          : null,
-    );
-    ConsentInformation.instance.requestConsentInfoUpdate(
-      params,
-      () {
-        // Consent info updated — show the form if required, then resolve.
-        ConsentForm.loadAndShowConsentFormIfRequired((_) => _resolveConsent());
-      },
-      (FormError _) {
-        // Offline / fetch error — fall back to whatever cached consent exists.
-        _resolveConsent();
-      },
-    );
-  }
+    _registerListeners();
 
-  /// Reads the resolved consent state and starts preloading ads if allowed.
-  Future<void> _resolveConsent() async {
-    _canRequestAds = await ConsentInformation.instance.canRequestAds();
+    // MAX's own consent flow replaces Google's UMP: it detects the user's
+    // geography and presents a GDPR-compliant CMP where one is required.
+    AppLovinMAX.setTermsAndPrivacyPolicyFlowEnabled(true);
+    AppLovinMAX.setPrivacyPolicyUrl('https://wallpapers-cdn.pages.dev/privacy');
+    if (_testDeviceIds.isNotEmpty) {
+      AppLovinMAX.setTestDeviceAdvertisingIds(_testDeviceIds);
+    }
+    AppLovinMAX.setVerboseLogging(!kReleaseMode);
+
+    final config = await AppLovinMAX.initialize(_sdkKey);
+    _initialized = config != null;
+    _canRequestAds = _initialized;
     if (!_adsAllowed.isCompleted) _adsAllowed.complete(_canRequestAds);
-    if (_canRequestAds) {
-      _loadInterstitial();
-      _loadRewarded();
+    if (!_canRequestAds) return;
+
+    // ATT after MAX's consent flow, before the first ad request: the CMP answers
+    // GDPR, ATT answers Apple, and the IDFA has to be settled before anything is
+    // fetched or the request goes out unpersonalised.
+    await _requestTrackingAuthorization();
+
+    AppLovinMAX.loadInterstitial(_interstitialUnitId);
+    AppLovinMAX.loadRewardedAd(_rewardedUnitId);
+  }
+
+  /// Shows Apple's App Tracking Transparency prompt on iOS.
+  ///
+  /// Only asks when the status is still `notDetermined` — iOS shows the system
+  /// dialog once per install, and calling again just returns the stored answer.
+  /// A denial is fine: ads keep serving, they are simply contextual.
+  Future<void> _requestTrackingAuthorization() async {
+    if (!Platform.isIOS) return;
+    try {
+      final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+      if (status != TrackingStatus.notDetermined) return;
+      // iOS silently drops the prompt if the app is not yet active — this runs
+      // right after the consent flow, so give the window a beat to settle.
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      await AppTrackingTransparency.requestTrackingAuthorization();
+    } catch (_) {
+      // Never block ad loading on the prompt failing.
     }
   }
 
-  void _loadInterstitial() {
-    if (!_initialized || !_canRequestAds) return;
-    InterstitialAd.load(
-      adUnitId: _interstitialUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => _interstitial = ad,
-        onAdFailedToLoad: (_) => _interstitial = null,
-      ),
-    );
+  void _registerListeners() {
+    AppLovinMAX.setInterstitialListener(InterstitialListener(
+      onAdLoadedCallback: (_) {},
+      // MAX retries internally with its own backoff — reloading here would
+      // fight that and hammer the network.
+      onAdLoadFailedCallback: (_, __) {},
+      onAdDisplayedCallback: (_) {},
+      onAdDisplayFailedCallback: (_, __) =>
+          AppLovinMAX.loadInterstitial(_interstitialUnitId),
+      onAdClickedCallback: (_) {},
+      onAdHiddenCallback: (_) =>
+          AppLovinMAX.loadInterstitial(_interstitialUnitId),
+    ));
+
+    AppLovinMAX.setRewardedAdListener(RewardedAdListener(
+      onAdLoadedCallback: (_) {},
+      onAdLoadFailedCallback: (_, __) {},
+      onAdDisplayedCallback: (_) {},
+      // The show never happened, so grant access rather than punishing the user
+      // for the network's failure.
+      onAdDisplayFailedCallback: (_, __) {
+        _settleReward(true);
+        AppLovinMAX.loadRewardedAd(_rewardedUnitId);
+      },
+      onAdClickedCallback: (_) {},
+      onAdHiddenCallback: (_) {
+        _settleReward(_rewardEarned);
+        AppLovinMAX.loadRewardedAd(_rewardedUnitId);
+      },
+      onAdReceivedRewardCallback: (_, __) => _rewardEarned = true,
+    ));
   }
 
-  void _loadRewarded() {
-    if (!_initialized || !_canRequestAds) return;
-    RewardedAd.load(
-      adUnitId: _rewardedUnitId,
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) => _rewarded = ad,
-        onAdFailedToLoad: (_) => _rewarded = null,
-      ),
-    );
+  void _settleReward(bool granted) {
+    _rewardTimeout?.cancel();
+    _rewardTimeout = null;
+    final c = _rewardCompleter;
+    _rewardCompleter = null;
+    if (c != null && !c.isCompleted) c.complete(granted);
   }
 
-  /// Show an interstitial (e.g. after a wallpaper is applied), subject to the
-  /// frequency cap, then preload the next one. No-op if not due or none ready.
+  /// Show an interstitial after a "value moment" — a wallpaper was applied or
+  /// saved. Subject to [_showEvery] and the shared cooldown.
+  ///
+  /// Safe to call unconditionally, including immediately after a rewarded
+  /// unlock: the cooldown in [_showInterstitial] rejects it. Callers must NOT
+  /// re-implement that check themselves.
   Future<void> maybeShowInterstitial() async {
     if (_adsOff || !_canRequestAds) return;
     _actionCount++;
-    final due = _actionCount % _showEvery == 0 &&
-        DateTime.now().difference(_lastShown) >= _minGap;
-    if (!due) return;
-
-    final ad = _interstitial;
-    if (ad == null) {
-      _loadInterstitial();
-      return;
-    }
-    _lastShown = DateTime.now();
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _interstitial = null;
-        _loadInterstitial();
-      },
-      onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _interstitial = null;
-        _loadInterstitial();
-      },
-    );
-    _interstitial = null;
-    try {
-      await ad.show();
-      AnalyticsService.logAdImpression('interstitial');
-    } catch (_) {
-      // show() rarely throws; the failure callback already disposes/reloads.
-    }
+    if (_actionCount % _showEvery != 0) return;
+    await _showInterstitial();
   }
 
-  /// Shows a rewarded ad to unlock premium (4K) content. Returns `true` if the
-  /// reward was earned — or if ads are unavailable, so the user is never hard
-  /// blocked by a missing/failed ad. Preloads the next rewarded afterwards.
+  /// Show an interstitial while the user browses (the shuffle button) — the
+  /// screen is about to change anyway, so an ad here costs no lost context.
+  ///
+  /// Uses its own, much looser counter: most sessions browse many more
+  /// wallpapers than they apply, and this trigger is what keeps the format
+  /// earning when nearly every wallpaper is rewarded-gated.
+  Future<void> maybeShowInterstitialOnBrowse() async {
+    if (_adsOff || !_canRequestAds) return;
+    _browseCount++;
+    if (_browseCount % _browseEvery != 0) return;
+    await _showInterstitial();
+  }
+
+  /// Shows the preloaded interstitial if the shared full-screen cooldown has
+  /// elapsed. No-op if too soon or none ready.
+  Future<void> _showInterstitial() async {
+    if (DateTime.now().difference(_lastFullScreen) < _minGap) return;
+    final ready = await AppLovinMAX.isInterstitialReady(_interstitialUnitId);
+    if (ready != true) return; // MAX is already retrying on its own
+    _noteFullScreenShown();
+    AppLovinMAX.showInterstitial(_interstitialUnitId);
+    AnalyticsService.logAdImpression('interstitial');
+  }
+
+  /// Records that a full-screen ad was just shown, starting the cooldown that
+  /// blocks the *next* one. Called for interstitial and rewarded alike.
+  void _noteFullScreenShown() => _lastFullScreen = DateTime.now();
+
+  /// Shows a rewarded ad to unlock gated content. Returns `true` if the reward
+  /// was earned — or if ads are unavailable, so the user is never hard blocked
+  /// by a missing or failed ad.
   Future<bool> showRewardedToUnlock() async {
     if (_adsOff || !_canRequestAds) return true;
-    final ad = _rewarded;
-    if (ad == null) {
-      _loadRewarded(); // not ready — grant this time, preload for next
+    final ready = await AppLovinMAX.isRewardedAdReady(_rewardedUnitId);
+    if (ready != true) {
+      // Not filled — grant this time; MAX keeps retrying in the background.
       return true;
     }
-    _rewarded = null;
-    final done = Completer<bool>();
-    var earned = false;
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _loadRewarded();
-        if (!done.isCompleted) done.complete(earned);
-      },
-      onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _loadRewarded();
-        if (!done.isCompleted) done.complete(true); // show failed — grant
-      },
-    );
-    try {
-      await ad.show(onUserEarnedReward: (_, __) => earned = true);
-      AnalyticsService.logAdImpression('rewarded');
-    } catch (_) {
-      if (!done.isCompleted) done.complete(true);
-    }
-    return done.future;
+    // A show already in flight means a duplicate tap; let the first one settle.
+    if (_rewardCompleter != null) return _rewardCompleter!.future;
+
+    _rewardEarned = false;
+    final completer = Completer<bool>();
+    _rewardCompleter = completer;
+    // Grant on timeout rather than refuse: if the SDK went silent the user did
+    // nothing wrong, and the unlock is worth less than a dead button.
+    _rewardTimeout?.cancel();
+    _rewardTimeout = Timer(_rewardTimeoutAfter, () => _settleReward(true));
+    _noteFullScreenShown();
+    AppLovinMAX.showRewardedAd(_rewardedUnitId);
+    AnalyticsService.logAdImpression('rewarded');
+    return completer.future;
   }
 }

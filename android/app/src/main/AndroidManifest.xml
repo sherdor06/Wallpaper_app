@@ -4,15 +4,16 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
 
     <application
-        android:label="Wallpapers 4K — Free"
+        android:label="Wavely"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- AdMob App ID (real — Android). -->
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-8510304338648685~6456890841" />
+        <!-- No ad-network meta-data here: AppLovin MAX takes its SDK key at
+             runtime (AdService._sdkKey), unlike AdMob which required its app id
+             in the manifest. Mediated networks configure themselves from the
+             MAX dashboard. -->
 
         <!-- Jonli (video) wallpaper servisi. -->
+
         <service
             android:name="com.sherdor.wallpapers.LiveWallpaperService"
             android:exported="true"

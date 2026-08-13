@@ -13,7 +13,7 @@
 | Saqlash | Cloudflare R2 | Egress bepul, $0.015/GB, S3-mos |
 | Yetkazib berish | Cloudflare CDN (custom domen) | Edge kesh, tez, arzon |
 | Katalog | JSON (R2'da) → keyin Supabase | Boshlash oson, keyin dinamik |
-| Reklama | AdMob (`google_mobile_ads`) | Asosiy daromad |
+| Reklama | AppLovin MAX (`applovin_max`) + Yandex mediatsiya | Asosiy daromad |
 | Obuna | RevenueCat (`purchases_flutter`) | Barqaror daromad |
 | Maqsad | Foydalanuvchi yig'ish + Tier-1 trafik | eCPM 5-10x oshadi |
 
@@ -41,7 +41,7 @@ AI generatsiya  →  Processing skript  →  R2 bucket  →  Cloudflare CDN  →
 - `cached_network_image` — rasmlarni qurilmada keshlash (qayta yuklanmaydi)
 - `dio` — HTTP / katalogni yuklash
 - `get` (GetX) — state management *(sen allaqachon ishlatasan)*
-- `google_mobile_ads` — AdMob reklama
+- `applovin_max` — AppLovin MAX mediatsiya (Yandex adapteri native tomonda)
 - `purchases_flutter` — RevenueCat obuna/IAP
 - `flutter_staggered_grid_view` — wallpaper grid (chiroyli)
 - `hive` yoki `shared_preferences` — sevimlilar (lokal)
