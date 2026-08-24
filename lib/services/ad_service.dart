@@ -44,6 +44,20 @@ class AdService {
   /// may be requested. Ad widgets (e.g. the banner) await this before loading.
   Future<bool> get adsAllowed => _adsAllowed.future;
 
+  /// Whether a rewarded ad could actually play, answered synchronously so the UI
+  /// can decide whether to offer one at all.
+  ///
+  /// [showRewardedToUnlock] grants the unlock for free when this is false, which
+  /// means any "watch an ad" affordance shown in that state is a promise the app
+  /// cannot keep — the tap just downloads. Screens that gate content must check
+  /// this before drawing the gate.
+  ///
+  /// Deliberately ignores [_canRequestAds]: that only goes true after
+  /// [initialize] returns, and a gate that appeared a second into every cold
+  /// start would flicker. This looks at the things known up front — the build
+  /// flag, the Remote Config kill switch, and whether credentials exist at all.
+  bool get rewardedAvailable => !_adsOff && !_credentialsMissing;
+
   // --- Frequency caps -------------------------------------------------------
   // Interstitials have two independent triggers:
   //   • value moments — a wallpaper was applied/saved → every [_showEvery]

@@ -85,20 +85,29 @@ class _DetailPageState extends State<DetailPage> {
   int? _fileBytes;
 
   /// Which screen the last Android apply targeted, so the done sub-line can
-  /// name it back to the user.
+  /// name it back to the user. Null only until the first apply of the session.
   WallpaperTarget? _activeTarget;
 
   Wallpaper get _w => widget.wallpaper;
 
-  /// A high-resolution wallpaper that hasn't been unlocked yet needs a rewarded
-  /// ad first. Each tier has its own Remote Config flag
-  /// (`rewarded_required_for_4k` / `_fhd`); turning one off makes that tier free.
-  bool get _locked {
+  /// Whether the rewarded gate applies to this wallpaper at all, regardless of
+  /// whether it has already been unlocked. Each tier has its own Remote Config
+  /// flag (`rewarded_required_for_4k` / `_fhd`); turning one off makes that tier
+  /// free. Everything that mentions the ad to the user hangs off this.
+  bool get _gated {
+    // Nothing to charge with while the ad SDK has no credentials (or ads are
+    // switched off): `showRewardedToUnlock` grants the unlock immediately in
+    // that state, so the gate would announce a cost it never collects. Dropping
+    // it here removes the whole affordance at once — the "Watch ad" chip, the
+    // "Playing" state, the pause before the download, and the "unlocked" badge.
+    if (!AdService.instance.rewardedAvailable) return false;
     final rc = RemoteConfigService.instance;
-    final gated = (_w.is4k && rc.rewardedRequiredFor4k) ||
+    return (_w.is4k && rc.rewardedRequiredFor4k) ||
         (_w.isFhd && rc.rewardedRequiredForFhd);
-    return gated && !UnlockService.instance.isUnlocked(_w.id);
   }
+
+  /// A gated wallpaper the user hasn't paid for yet — a rewarded ad comes first.
+  bool get _locked => _gated && !UnlockService.instance.isUnlocked(_w.id);
 
   /// Ensures a gated wallpaper is unlocked (via a rewarded ad) before
   /// proceeding. Grants access when ads are unavailable, so a missing or failed
@@ -243,12 +252,12 @@ class _DetailPageState extends State<DetailPage> {
       _setSaveState(_SaveState.locked);
       _snack('Something went wrong');
     } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _activeTarget = null;
-        });
-      }
+      // _activeTarget deliberately survives this block: the done sub-line names
+      // the screen back to the user, and that line is still on show for
+      // [_doneHold] after the apply returns. Clearing it here made every apply
+      // read "Applied to your home screen" regardless of what was picked. The
+      // next apply overwrites it, and no other state reads it.
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -555,10 +564,12 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   /// Resolution / dimensions / size. The first badge turns into a `… unlocked`
-  /// confirmation while the file downloads.
+  /// confirmation while the file downloads — but only where an unlock was ever
+  /// required, otherwise it would celebrate passing a gate that wasn't there.
   Widget _buildBadgeRow() {
-    final unlockedNow = _saveState == _SaveState.downloading ||
-        _saveState == _SaveState.done;
+    final unlockedNow = _gated &&
+        (_saveState == _SaveState.downloading ||
+            _saveState == _SaveState.done);
     final detail = [
       _dimensions[_w.resolution],
       if (_fileBytes != null) _formatBytes(_fileBytes!),
@@ -885,7 +896,7 @@ class _DetailPageState extends State<DetailPage> {
         weight = FontWeight.w600;
       case _SaveState.locked:
       case _SaveState.downloading:
-        text = 'Saved at full resolution to your Photos';
+        text = _restingSubLine();
         color = Colors.white.withValues(alpha: 0.60);
         weight = FontWeight.w500;
     }
@@ -898,6 +909,24 @@ class _DetailPageState extends State<DetailPage> {
         style: TextStyle(fontSize: 11.5, fontWeight: weight, color: color),
       ),
     );
+  }
+
+  /// The line shown before the tap and while the file transfers.
+  ///
+  /// The two platforms promise different things and cannot share one sentence:
+  /// iOS puts a file in Photos, Android writes the wallpaper itself onto a
+  /// screen the target sheet asks about. Both keep "full resolution" — that is
+  /// the part the user is deciding on.
+  String _restingSubLine() {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return 'Saved at full resolution to your Photos';
+    }
+    final target = _activeTarget;
+    if (_saveState == _SaveState.downloading && target != null) {
+      return 'Applying at full resolution to your '
+          '${_targetName(target).toLowerCase()}';
+    }
+    return 'Full resolution — you choose Home or Lock screen';
   }
 }
 
