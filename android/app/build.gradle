@@ -68,7 +68,20 @@ dependencies {
     //
     // Yandex first because it carries this app's CIS audience — MAX's own
     // demand is thin there, and that region is where most installs land.
-    implementation "com.applovin.mediation:yandex-adapter:7.18.5.0"
+    //
+    // 8.0.0.0 specifically, not the newest. AppMetrica ships in this app twice —
+    // once through appmetrica_plugin, once underneath the Yandex ad SDK — and
+    // the ad SDK pins its copy *strictly*:
+    //
+    //   adapter 8.0.0.0 -> mobileads 8.0.0 -> analytics [8.0.0, 9.0.0)   OK
+    //   adapter 8.1.0.0 ->                    analytics [8.1.0, 9.0.0)
+    //   adapter 8.3.0.0 ->                    analytics [8.3.0, 9.0.0)
+    //
+    // appmetrica_plugin 4.0.0 (pinned in pubspec.yaml, for the iOS side of the
+    // same clash) brings analytics 8.0.0, so anything above 8.0.0.0 fails to
+    // resolve. The iOS Podfile is on 8.3.0 because CocoaPods resolves a
+    // different artifact there — the two are expected to differ.
+    implementation "com.applovin.mediation:yandex-adapter:8.0.0.0"
 }
 
 flutter { source = "../.." }
