@@ -11,6 +11,7 @@ import '../models/wallpaper.dart';
 import '../services/history_service.dart';
 import 'detail_page.dart';
 import 'widgets/app_loader.dart';
+import 'widgets/empty_state.dart';
 import 'widgets/floating_chrome.dart';
 import 'widgets/wallpaper_grid.dart' show gridColumnsFor;
 import 'widgets/wallpaper_tile.dart';
@@ -525,23 +526,24 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.inventory_2_outlined,
-              size: 46, color: Theme.of(context).disabledColor),
-          const SizedBox(height: 12),
-          Text('No wallpapers yet',
-              style: TextStyle(color: Theme.of(context).hintColor)),
-          const SizedBox(height: 4),
-          Text(
-            'Wallpapers you set or save appear here.',
-            style: TextStyle(
-                color: Theme.of(context).hintColor.withValues(alpha: 0.7),
-                fontSize: 12.5),
-          ),
-        ],
+    // No action button, unlike Favorites: on Android this page is pushed from
+    // the chrome, so back already returns to the catalog, and on iOS it is a
+    // tab. A "Browse" button here would only duplicate a route the user has.
+    //
+    // The sub-line is not the one the spec asked for ("Wallpapers you archive
+    // stay here, out of the main grid"), because this screen is not that: it is
+    // [HistoryService] — filled automatically by setting or saving, never by an
+    // archive action, and the entries stay in the main grid the whole time.
+    return const Center(
+      child: EmptyState(
+        animation: 'assets/anim/empty_grid.json',
+        headline: 'Archive is empty',
+        subLine: 'Wallpapers you set or save appear here.',
+        fallbackIcon: Icons.inventory_2_outlined,
+        // Larger than the default: the grid artwork is two narrow columns on a
+        // square canvas, so it reads smaller than the heart at the same box.
+        // This screen also has no action button under it, leaving the room.
+        artSize: 168,
       ),
     );
   }

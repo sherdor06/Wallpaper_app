@@ -1,9 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:lottie/lottie.dart';
 
 import '../../models/wallpaper.dart';
 import '../detail_page.dart';
+import 'empty_state.dart';
 import 'wallpaper_tile.dart';
 
 /// Number of columns for a grid [width] wide, chosen so each tile lands near
@@ -31,6 +33,12 @@ class WallpaperGrid extends StatelessWidget {
   final Future<void> Function()? onRefresh;
   final String emptyText;
 
+  /// Shown instead of [emptyText] when the list is empty — an [EmptyState] for
+  /// screens that have something to say about *why* they are empty. Home has
+  /// nothing to say (an empty catalog is a fault, not a state the user created),
+  /// so it stays on the plain line.
+  final Widget? empty;
+
   /// Top inset so the first row starts below the translucent app bar (and any
   /// tab header) while still scrolling behind it.
   final double topPadding;
@@ -40,6 +48,7 @@ class WallpaperGrid extends StatelessWidget {
     required this.items,
     this.onRefresh,
     this.emptyText = 'No wallpapers',
+    this.empty,
     this.topPadding = 8,
   });
 
@@ -52,30 +61,7 @@ class WallpaperGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Widget child = items.isEmpty
-        // Must be scrollable for RefreshIndicator to work.
-        ? ListView(
-            padding: EdgeInsets.only(top: topPadding),
-            children: [
-              const SizedBox(height: 80),
-              Center(
-                child: Lottie.asset(
-                  'assets/anim/empty.json',
-                  width: 160,
-                  height: 160,
-                  repeat: true,
-                  // The empty state must never be the thing that breaks; a
-                  // missing asset falls back to a plain icon.
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.image_not_supported_outlined,
-                    size: 72,
-                    color: Colors.white24,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(child: Text(emptyText, style: const TextStyle(color: Colors.white54))),
-            ],
-          )
+        ? _buildEmpty(context)
         : LayoutBuilder(
             // Measures the grid itself rather than the window: this sits inside
             // the shell's padding, and on a tablet the difference is a whole
@@ -102,5 +88,38 @@ class WallpaperGrid extends StatelessWidget {
 
     if (onRefresh == null) return child;
     return RefreshIndicator(onRefresh: onRefresh!, child: child);
+  }
+
+  /// The empty view, centred in whatever room is left between the floating top
+  /// chrome and the bottom nav — and scrollable even though it always fits, or
+  /// [RefreshIndicator] would have nothing to pull on.
+  Widget _buildEmpty(BuildContext context) {
+    // The shell uses extendBody, so the nav bar and the ad banner sit *over* the
+    // bottom of this box; centring in the raw height would tuck the action
+    // button under them.
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(top: topPadding, bottom: bottomInset),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            // An unbounded parent would make this infinite and blow up the
+            // layout, so fall back to hugging the content there.
+            minHeight: constraints.hasBoundedHeight
+                ? math.max(0, constraints.maxHeight - topPadding - bottomInset)
+                : 0,
+          ),
+          child: Center(
+            child: empty ??
+                EmptyState(
+                  animation: 'assets/anim/empty.json',
+                  headline: emptyText,
+                  fallbackIcon: Icons.image_not_supported_outlined,
+                ),
+          ),
+        ),
+      ),
+    );
   }
 }

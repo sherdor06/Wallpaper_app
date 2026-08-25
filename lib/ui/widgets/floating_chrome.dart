@@ -127,6 +127,70 @@ class ChromeIconButton extends StatelessWidget {
   }
 }
 
+/// Floating pill button with a label and an optional leading glyph — the wide
+/// sibling of [ChromeIconButton].
+///
+/// Same platform split as the rest of this file: iOS gets liquid glass (with the
+/// package's press stretch, so it feels like the nav bar it sits under), Android
+/// gets the solid pill, because the glass pipeline is skipped there entirely
+/// (see the `builder` in main.dart) and a lone glass widget would be the only
+/// thing in the app paying for it.
+class ChromePillButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const ChromePillButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: _accent),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (Platform.isAndroid) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: kTopBarHeight,
+          alignment: Alignment.center,
+          decoration: _solidDecoration(context, radius: kTopBarHeight / 2),
+          child: content,
+        ),
+      );
+    }
+    // Null width hugs the label (the package puts it straight on a SizedBox).
+    return GlassButton.custom(
+      onTap: onTap,
+      height: kTopBarHeight,
+      shape: const LiquidRoundedSuperellipse(borderRadius: kTopBarHeight / 2),
+      child: content,
+    );
+  }
+}
+
 /// Continuously rotating gradient arc ("comet") around its [child] — decorates
 /// the title pill on both platforms. Respects reduced motion (freezes when
 /// animations are off).

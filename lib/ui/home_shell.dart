@@ -71,7 +71,9 @@ class _HomeShellState extends State<HomeShell> {
 
   List<Widget> get _pages => [
         HomeTab(resetSignal: _homeReset),
-        const FavoritesTab(),
+        // Its empty state offers a way to the catalog, which on both platforms
+        // means switching tab — Favorites is a page in the stack, not a route.
+        FavoritesTab(onBrowse: () => _select(0)),
         if (_archiveIsTab)
           ArchivePage(
             onSelectingChanged: (v) => setState(() => _archiveSelecting = v),
