@@ -61,19 +61,24 @@ class DeepLinkService {
   Future<void> init(GlobalKey<NavigatorState> navigator) async {
     _navigator = navigator;
     _sub ??= _appLinks.uriLinkStream.listen(
-      _open,
+      handleUri,
       // A malformed link is the sender's problem, not a crash.
       onError: (_) {},
     );
     try {
       final initial = await _appLinks.getInitialLink();
-      if (initial != null) await _open(initial);
+      if (initial != null) await handleUri(initial);
     } catch (_) {
       // Nothing launched us; normal cold start.
     }
   }
 
-  Future<void> _open(Uri uri) async {
+  /// Opens the wallpaper a link points at, if it points at one of ours.
+  ///
+  /// Public because notifications arrive through a different door but mean the
+  /// same thing — [PushService] hands campaign links straight here rather than
+  /// growing a second, subtly different resolver.
+  Future<void> handleUri(Uri uri) async {
     final id = wallpaperIdFrom(uri);
     if (id == null) return;
 

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/ad_service.dart';
 import '../services/consent_service.dart';
+import '../services/push_service.dart';
 import '../services/image_cache.dart';
 import '../services/theme_service.dart';
 import 'widgets/consent_dialog.dart';
@@ -68,6 +69,9 @@ class SettingsPage extends StatelessWidget {
               );
             },
           ),
+          const Divider(height: 0),
+          const _SectionHeader('Notifications'),
+          const _PushTile(),
           const Divider(height: 0),
           const _SectionHeader('Legal'),
           ListTile(
@@ -137,6 +141,52 @@ IconData _themeIcon(ThemeMode m) => switch (m) {
       ThemeMode.light => Icons.light_mode_outlined,
       ThemeMode.dark => Icons.dark_mode_outlined,
     };
+
+/// Notification switch.
+///
+/// Turning it on runs the same permission request the app makes after a couple
+/// of applies — someone reaching for this switch has answered that question
+/// themselves, so the "ask only once" guard does not apply.
+///
+/// A denied system permission cannot be re-requested from inside the app, so
+/// the switch reports what actually happened rather than the tap.
+class _PushTile extends StatelessWidget {
+  const _PushTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: PushService.instance,
+      builder: (context, _) {
+        final on = PushService.instance.enabled;
+        return SwitchListTile(
+          secondary: const Icon(Icons.notifications_outlined),
+          title: const Text('New wallpaper alerts'),
+          subtitle: Text(on
+              ? 'On — we will tell you when new wallpapers land'
+              : 'Off'),
+          value: on,
+          onChanged: (want) async {
+            if (!want) {
+              await PushService.instance.disable();
+              return;
+            }
+            final granted = await PushService.instance.requestPermission();
+            if (granted || !context.mounted) return;
+            // Blocked at the OS level; the app cannot prompt again.
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Notifications are blocked in system settings for this app.',
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
 
 /// The consent row, kept stateful on its own so the rest of the page can stay
 /// stateless — it is the only thing here that has to redraw after a tap.

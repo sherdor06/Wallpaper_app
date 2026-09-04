@@ -17,6 +17,7 @@ import 'services/consent_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/favorites_service.dart';
 import 'services/history_service.dart';
+import 'services/push_service.dart';
 import 'services/remote_config_service.dart';
 import 'services/theme_service.dart';
 import 'services/unlock_service.dart';
@@ -80,6 +81,9 @@ Future<void> main() async {
   await HistoryService.instance.init();
   await UnlockService.instance.init();
   await ThemeService.instance.init();
+  // After history: PushService reads the applied-wallpaper count to decide
+  // whether the permission prompt has been earned yet.
+  await PushService.instance.init();
   runApp(const WallpaperApp());
 }
 

@@ -17,6 +17,7 @@ import '../services/history_service.dart';
 import '../services/image_cache.dart';
 import '../services/remote_config_service.dart';
 import '../services/deep_link_service.dart';
+import '../services/push_service.dart';
 import '../services/unlock_service.dart';
 import '../services/wallpaper_service.dart';
 import 'widgets/badges.dart';
@@ -274,6 +275,9 @@ class _DetailPageState extends State<DetailPage> {
       );
       AnalyticsService.logWallpaperSet(_w.id, target: target.value);
       HistoryService.instance.add(_w.id);
+      // The one moment the app has clearly been useful — which is the only
+      // moment worth spending Android's single notification prompt on.
+      unawaited(PushService.instance.maybeAskPermission());
       // Unconditional: AdService's shared full-screen cooldown suppresses this
       // when the unlock above just played a rewarded ad, so there is no need to
       // gate it on the wallpaper having been unlocked.

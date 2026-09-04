@@ -164,3 +164,36 @@ Qaytarish qiyin emas: `AdService` ning tashqi interfeysi tarmoqqa bog'liq emas
 shuning uchun mediation qaytarilsa faqat shu bitta fayl va banner widget
 o'zgaradi — UI'ga tegilmaydi. Yandex esa MAX ichida bidder sifatida
 ishlatiladi va yuqoridagi `R-M-...` ID'lar o'sha yerga kiritiladi.
+
+---
+
+## Push xabarnomalar (Firebase Cloud Messaging)
+
+**Nega AppMetrica emas:** `appmetrica_push` paketining yagona versiyasi 2022-yilda
+chiqqan va `Dart <3.0.0` talab qiladi — loyiha Dart 3.9 da, ya'ni o'rnatib
+bo'lmaydi. FCM faol qo'llab-quvvatlanadi va Firebase allaqachon ulangan.
+
+Segmentatsiya yo'qolmadi: Firebase Console -> Messaging xabarni **Analytics
+auditoriyalariga** yubora oladi, ilova esa `wallpaper_view`, `wallpaper_set`,
+`rewarded_unlock`, `wallpaper_share` hodisalarini yuboradi — auditoriyalar shular
+ustiga quriladi.
+
+**Ruxsat qachon so'raladi:** ilova ochilganda emas, foydalanuvchi **2 ta
+wallpaper qo'ygandan keyin** (`PushService._promptAfterApplies`). Android 13+
+bitta imkon beradi va birinchi ochilishdagi so'rov ko'pincha rad etiladi.
+Settings -> *New wallpaper alerts* orqali qo'lda ham yoqiladi.
+
+**Xabar yuborishda:** `link` data maydoniga share havolasini qo'ying —
+`https://wallpapers-cdn.pages.dev/w/<kategoriya>/<nom>`. Bosilganda ilova o'sha
+wallpaper'ni ochadi (`DeepLinkService.handleUri` orqali, share bilan bir yo'l).
+Havolasiz xabar shunchaki ilovani ochadi.
+
+Barcha ruxsat bergan qurilmalar `all` topikiga obuna bo'ladi — Console yoki FCM
+API'dan shu nom bilan murojaat qilinadi.
+
+**Ilova old planda bo'lganda xabar ko'rinmaydi** (Android'da bu normal). Buning
+uchun `flutter_local_notifications` kerak bo'lardi; wallpaper ilovasida
+foydalanuvchi allaqachon ichkarida bo'lgani uchun qo'shilmadi.
+
+**iOS uchun keyinroq:** APNs kaliti Firebase Console -> Project settings ->
+Cloud Messaging ga yuklanishi kerak. Android bunisiz ishlayveradi.
