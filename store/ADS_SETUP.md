@@ -18,7 +18,7 @@ to'xtatildi — pastda "Keyinga qoldirilgan" bo'limida.
 | iOS ad unit'lar | ⏳ App Store'ga chiqqach |
 | Play Console: privacy policy manzili | ✅ `wallpapers-cdn.pages.dev/privacy` |
 | app-ads.txt | ✅ portfolio domenida jonli |
-| GDPR consent (CMP) | ⚠️ yo'q — pastga qarang |
+| GDPR consent oynasi | ✅ kodda — Firebase shartini qo'shish kerak |
 
 ## Ad unit ID'lar (Android)
 
@@ -62,18 +62,43 @@ Yandex'da ilova dastlab **Test mode** da bo'ladi: reklama ko'rinadi, lekin pul
 hisoblanmaydi. Haqiqiy daromad moderatsiya va ilovaga egalik tasdiqlangandan
 keyin boshlanadi. Partner interfeysida ilova statusini kuzatib boring.
 
-### 3. ⚠️ GDPR consent — daromadga ta'sir qiladi
+### 3. 🟠 Firebase'da `consent_required` shartini yoqish
 
-Yandex SDK'da MAX'dagi kabi tayyor CMP yo'q, ya'ni `setUserConsent` bayrog'ini
-o'zimiz qo'yamiz. Ilovada consent so'raydigan oyna yo'q, shuning uchun hozircha:
+Consent oynasi kodda tayyor (`lib/services/consent_service.dart` +
+`lib/ui/widgets/consent_dialog.dart`). Ishlashi:
 
-- **iOS:** ATT javobi ishlatiladi (ruxsat berilgan bo'lsa `true`)
-- **Android:** har doim `false` → personalizatsiyalanmagan reklama
+| Foydalanuvchi | Nima bo'ladi |
+|---|---|
+| EEA/Britaniyadan tashqarida | Hech narsa so'ralmaydi, consent `true` → **personalizatsiyalangan reklama** |
+| EEA/Britaniyada | Splash tugagach bir marta oyna chiqadi; javob berilmaguncha reklama SDK'si ishga tushmaydi |
 
-Bu **butun Android auditoriya uchun**, jumladan GDPR umuman tegishli bo'lmagan
-O'zbekiston foydalanuvchilari uchun ham eCPM'ni pasaytiradi. Tuzatish yo'llari:
-EEA'da ko'rsatiladigan oddiy consent dialogi, yoki tayyor CMP. Bu birinchi
-optimizatsiya nomzodi.
+Hudud ikki manbadan aniqlanadi:
+
+1. **Firebase Remote Config** — `consent_required` (asosiy, aniq)
+2. **Qurilma tili/regioni** — RC kelmasa ishlaydigan zaxira
+
+**Sizdan talab qilinadigan qadam:** Firebase Console → Remote Config →
+`consent_required` parametrini qo'shing (Boolean, default `false`), so'ng unga
+**Condition** biriktiring:
+
+- Condition nomi: `EEA and UK`
+- Applies if: **Country/Region** → EEA 30 davlati + United Kingdom
+- Value in this condition: `true`
+
+Firebase mamlakatni server tomonda so'rovdan aniqlaydi — bu ilova ichidan
+mavjud bo'lgan yagona ishonchli signal.
+
+Shartsiz ham ilova ishlaydi: O'zbekistonda hech kim so'ralmaydi va reklama
+personalizatsiyalanadi (ya'ni eCPM ko'tariladi), lekin EEA foydalanuvchisi
+faqat qurilma tili orqali aniqlanadi.
+
+> **Eslatma:** bu IAB TCF sertifikatlangan CMP emas. Yandex SDK'si bitta
+> boolean qabul qiladi va shu to'ldiriladi. Bitta tarmoq uchun yetarli;
+> mediation qo'shilsa yoki EEA trafigi jiddiy ulushga aylansa, haqiqiy CMP
+> kerak bo'ladi.
+
+Foydalanuvchi fikrini istalgan vaqtda o'zgartira oladi: Settings → **Ad
+personalisation** (GDPR talabi — rad etish berish kabi oson bo'lishi shart).
 
 ### 4. ⏳ iOS
 

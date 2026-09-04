@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:yandex_mobileads/mobile_ads.dart';
 
 import 'analytics_service.dart';
+import 'consent_service.dart';
 import 'remote_config_service.dart';
 
 /// Manages ads through the Yandex Mobile Ads SDK. Ads are the only
@@ -156,10 +157,11 @@ class AdService {
     }
 
     await YandexAds.setLogging(!kReleaseMode);
-    // Privacy has to be settled before the SDK starts: ATT decides whether iOS
-    // hands out an IDFA at all, and the consent flag rides on every request.
-    await _requestTrackingAuthorization();
+    // Privacy has to be settled before the SDK starts. Consent first — it can
+    // wait on a dialog — then ATT, which is the order regulators and Apple both
+    // expect: establish a lawful basis, then ask about the IDFA.
     await _applyUserConsent();
+    await _requestTrackingAuthorization();
 
     await YandexAds.initialize();
     _canRequestAds = true;
@@ -192,28 +194,33 @@ class AdService {
 
   /// Tells the SDK whether personal data may be used for targeting.
   ///
-  /// Unlike MAX, this SDK ships no consent management platform — the flag is
-  /// ours to set, and there is no dialog in the app to set it from. So the
-  /// answer is "no" unless something already asked: on iOS, ATT is exactly that
-  /// question, and an authorized status carries the user's own yes.
+  /// The value comes from [ConsentService], which grants it outright outside
+  /// the EEA/UK and otherwise waits on the user's own answer — so this call can
+  /// block for as long as the dialog is on screen. That is the point: it sits
+  /// before `YandexAds.initialize`, so no request can leave carrying a consent
+  /// value nobody gave.
   ///
-  /// The cost is non-personalised ads (and a lower price) for Android users
-  /// everywhere, including the CIS audience GDPR never covered. Adding a CMP —
-  /// or a consent dialog shown only in the EEA — is what turns that back on.
+  /// Kept separate from ATT even on iOS. They answer different questions —
+  /// Apple's is about cross-app tracking, the GDPR one is about processing
+  /// personal data at all — and an EEA iPhone legitimately sees both prompts.
   Future<void> _applyUserConsent() async {
-    var consent = false;
-    if (Platform.isIOS) {
-      try {
-        final status = await AppTrackingTransparency.trackingAuthorizationStatus;
-        consent = status == TrackingStatus.authorized;
-      } catch (_) {
-        consent = false;
-      }
-    }
+    final consent = await ConsentService.instance.decision;
     try {
       await YandexAds.setUserConsent(consent);
     } catch (_) {
       // Defaults to no consent inside the SDK, which is the safe direction.
+    }
+  }
+
+  /// Pushes a changed answer to the SDK after the user revisits the choice in
+  /// Settings. Ads already loaded keep whatever they were requested with; the
+  /// next request picks this up.
+  Future<void> updateUserConsent(bool granted) async {
+    if (!_canRequestAds) return;
+    try {
+      await YandexAds.setUserConsent(granted);
+    } catch (_) {
+      // Nothing to recover — the stored answer is still correct.
     }
   }
 

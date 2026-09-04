@@ -13,6 +13,7 @@ import 'config/app_config.dart';
 import 'firebase_options.dart';
 import 'services/ad_service.dart';
 import 'services/analytics_service.dart';
+import 'services/consent_service.dart';
 import 'services/favorites_service.dart';
 import 'services/history_service.dart';
 import 'services/remote_config_service.dart';
@@ -61,14 +62,17 @@ Future<void> main() async {
   if (!Platform.isAndroid) {
     await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
   }
-  // Remote Config first — AdService reads the ad kill switch / frequency from it.
+  // Remote Config first — AdService reads the ad kill switch / frequency from
+  // it, and ConsentService reads the `consent_required` region flag.
   await RemoteConfigService.instance.init();
-  // AdMob init + UMP consent — deliberately NOT awaited. Nothing on screen
-  // needs it: the banner awaits [AdService.adsAllowed] itself, and every
-  // interstitial/rewarded path is guarded until consent resolves. Awaiting it
-  // would put the whole ad stack on the cold-start critical path — cheap today
-  // with AdMob alone, but seconds once mediation adapters are added, since each
-  // adapter initializes inside MobileAds.initialize().
+  // Then the stored consent answer, so [ConsentService.isRequired] is truthful
+  // by the time the splash finishes and decides whether to ask.
+  await ConsentService.instance.init();
+  // Ad init — deliberately NOT awaited. Nothing on screen needs it: the banner
+  // awaits [AdService.adsAllowed] itself, and every interstitial/rewarded path
+  // is guarded until consent resolves. Awaiting it would put the whole ad stack
+  // on the cold-start critical path — and in the EEA it would block startup for
+  // as long as the consent dialog is on screen, which it waits for.
   unawaited(AdService.instance.init());
   // Load favorites + unlocked (4K) wallpapers + theme choice from disk.
   await FavoritesService.instance.init();

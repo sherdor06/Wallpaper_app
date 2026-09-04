@@ -19,6 +19,7 @@ class RemoteConfigService {
   static const _kAdMinGapSeconds = 'ad_min_gap_seconds';
   static const _kRewardedRequiredFor4k = 'rewarded_required_for_4k';
   static const _kRewardedRequiredForFhd = 'rewarded_required_for_fhd';
+  static const _kConsentRequired = 'consent_required';
 
   // Safe defaults (identical to the old constants) — used until/unless the
   // console overrides them.
@@ -28,6 +29,11 @@ class RemoteConfigService {
   static const int _defAdMinGapSeconds = 45;
   static const bool _defRewardedRequiredFor4k = true;
   static const bool _defRewardedRequiredForFhd = true;
+  // Defaults to false so the CIS audience is never asked a GDPR question that
+  // does not apply to them. The console condition turns it on for the EEA/UK;
+  // ConsentService also asks on a device-locale hint, which covers the case
+  // where this value never arrived.
+  static const bool _defConsentRequired = false;
 
   FirebaseRemoteConfig? _rc;
 
@@ -50,6 +56,7 @@ class RemoteConfigService {
         _kAdMinGapSeconds: _defAdMinGapSeconds,
         _kRewardedRequiredFor4k: _defRewardedRequiredFor4k,
         _kRewardedRequiredForFhd: _defRewardedRequiredForFhd,
+        _kConsentRequired: _defConsentRequired,
       });
       await rc.fetchAndActivate();
       _rc = rc;
@@ -92,4 +99,12 @@ class RemoteConfigService {
   /// tier. Resolution labels stay accurate — only the gate widens.
   bool get rewardedRequiredForFhd =>
       _rc?.getBool(_kRewardedRequiredForFhd) ?? _defRewardedRequiredForFhd;
+
+  /// Whether this user must be asked for ad-personalisation consent.
+  ///
+  /// Set through a console *condition* rather than a plain value — Firebase
+  /// resolves the country server-side, which is the only signal here that
+  /// actually knows where the device is. See [ConsentService].
+  bool get consentRequired =>
+      _rc?.getBool(_kConsentRequired) ?? _defConsentRequired;
 }
