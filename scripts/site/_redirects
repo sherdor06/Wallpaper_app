@@ -1,5 +1,12 @@
-# Every shared wallpaper link renders from one page; w.html reads the id out of
-# the path. Status 200 rewrites instead of redirecting, so the URL the friend
+# Every shared wallpaper link renders from one page; share.html reads the id out
+# of the path. Status 200 rewrites instead of redirecting, so the URL the friend
 # sees stays the one that was shared -- which is also the URL Android matches
 # against the App Links intent filter.
-/w/*  /w.html  200
+#
+# Two Cloudflare Pages behaviours shape this line:
+#   * Pages canonicalises /<name>.html to /<name>, so the destination is written
+#     WITHOUT the extension. Targeting /share.html made Pages answer the rewrite
+#     with a 308 to /share, turning the rewrite back into a redirect.
+#   * The page must not be called w.html either: /w.html folds to /w, and every
+#     /w/<id> request then collapsed into /w with the id thrown away.
+/w/*  /share  200
