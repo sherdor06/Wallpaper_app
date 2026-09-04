@@ -10,7 +10,7 @@ to'xtatildi — pastda "Keyinga qoldirilgan" bo'limida.
 
 | Qism | Holat |
 |------|-------|
-| Yandex akkaunti + ilova (ID 19979404) | ✅ |
+| Yandex akkaunti + ilova (ID 19979404) | ✅ moderatsiyadan o'tdi |
 | Android ad unit'lar (banner / interstitial / rewarded) | ✅ |
 | `yandex_mobileads: ^8.4.0` paketi | ✅ |
 | `AdService` — init, consent, banner, interstitial, rewarded, chastota | ✅ |
@@ -56,11 +56,17 @@ Manba: `sherdor06/sherdor-portfolio` repo, `public/app-ads.txt` (Next.js
 `wallpapers-cdn.pages.dev/app-ads.txt` da ham nusxa bor. U ishlatilmaydi,
 lekin zarar ham qilmaydi — Play listingidagi domen o'zgarsa asqotishi mumkin.
 
-### 2. 🟠 Moderatsiya
+### 2. ✅ Moderatsiya — o'tdi (2026-09-04)
 
-Yandex'da ilova dastlab **Test mode** da bo'ladi: reklama ko'rinadi, lekin pul
-hisoblanmaydi. Haqiqiy daromad moderatsiya va ilovaga egalik tasdiqlangandan
-keyin boshlanadi. Partner interfeysida ilova statusini kuzatib boring.
+Yandex tasdiqladi: `com.sherdor.wallpapers` tarmoqqa qabul qilindi, Test mode
+tugadi. Endi haqiqiy reklama ko'rsatiladi va daromad hisoblanadi.
+
+**Ammo daromad hali oqmaydi:** Play'dagi jonli versiya `1.0.0+3` — bu Yandex
+SDK'siz qurilgan build. Pul faqat `1.0.1+4` chiqarilgandan keyin kela boshlaydi.
+
+Yana bir muddat: **bank rekvizitlari** 2026-11-02 gacha yoki daromad $100 ga
+yetguncha to'ldirilishi shart, aks holda impressiyalar to'xtatiladi. USD
+valyuta hisobi kerak (so'm kartasi SWIFT o'tkazmasini qabul qilmaydi).
 
 ### 3. 🟠 Firebase'da `consent_required` shartini yoqish
 
