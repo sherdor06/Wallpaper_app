@@ -31,6 +31,12 @@ target 'Runner' do
   use_frameworks!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # No ad-network pods here. Yandex Mobile Ads is used directly now, and the
+  # yandex_mobileads plugin's podspec pulls `YandexMobileAds ~> 8.4.0` itself --
+  # the AppLovin MAX adapter that used to sit here left with the mediation layer.
+  # If a second network is ever mediated in, its adapter pod goes here.
+
   target 'RunnerTests' do
     inherit! :search_paths
   end

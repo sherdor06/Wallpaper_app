@@ -15,15 +15,25 @@ class RemoteConfigService {
   // Remote Config parameter keys — create these in the Firebase console.
   static const _kAdsEnabled = 'ads_enabled';
   static const _kAdShowEvery = 'ad_show_every';
+  static const _kAdBrowseEvery = 'ad_browse_every';
   static const _kAdMinGapSeconds = 'ad_min_gap_seconds';
   static const _kRewardedRequiredFor4k = 'rewarded_required_for_4k';
+  static const _kRewardedRequiredForFhd = 'rewarded_required_for_fhd';
+  static const _kConsentRequired = 'consent_required';
 
   // Safe defaults (identical to the old constants) — used until/unless the
   // console overrides them.
   static const bool _defAdsEnabled = true;
   static const int _defAdShowEvery = 3;
+  static const int _defAdBrowseEvery = 8;
   static const int _defAdMinGapSeconds = 45;
   static const bool _defRewardedRequiredFor4k = true;
+  static const bool _defRewardedRequiredForFhd = true;
+  // Defaults to false so the CIS audience is never asked a GDPR question that
+  // does not apply to them. The console condition turns it on for the EEA/UK;
+  // ConsentService also asks on a device-locale hint, which covers the case
+  // where this value never arrived.
+  static const bool _defConsentRequired = false;
 
   FirebaseRemoteConfig? _rc;
 
@@ -42,8 +52,11 @@ class RemoteConfigService {
       await rc.setDefaults(<String, dynamic>{
         _kAdsEnabled: _defAdsEnabled,
         _kAdShowEvery: _defAdShowEvery,
+        _kAdBrowseEvery: _defAdBrowseEvery,
         _kAdMinGapSeconds: _defAdMinGapSeconds,
         _kRewardedRequiredFor4k: _defRewardedRequiredFor4k,
+        _kRewardedRequiredForFhd: _defRewardedRequiredForFhd,
+        _kConsentRequired: _defConsentRequired,
       });
       await rc.fetchAndActivate();
       _rc = rc;
@@ -63,7 +76,15 @@ class RemoteConfigService {
     return v > 0 ? v : _defAdShowEvery;
   }
 
-  /// Minimum seconds between two interstitials (min 0).
+  /// Show an interstitial at most every N browse steps — currently the shuffle
+  /// button (min 1). Looser than [adShowEvery] because browsing is frequent.
+  int get adBrowseEvery {
+    final v = _rc?.getInt(_kAdBrowseEvery) ?? _defAdBrowseEvery;
+    return v > 0 ? v : _defAdBrowseEvery;
+  }
+
+  /// Minimum seconds between any two full-screen ads — interstitial *and*
+  /// rewarded share this gap, so the two can never appear back to back.
   int get adMinGapSeconds {
     final v = _rc?.getInt(_kAdMinGapSeconds) ?? _defAdMinGapSeconds;
     return v >= 0 ? v : _defAdMinGapSeconds;
@@ -73,4 +94,17 @@ class RemoteConfigService {
   /// `false` makes all 4K wallpapers free to use.
   bool get rewardedRequiredFor4k =>
       _rc?.getBool(_kRewardedRequiredFor4k) ?? _defRewardedRequiredFor4k;
+
+  /// Same gate for Full-HD wallpapers, so monetization isn't limited to the 4K
+  /// tier. Resolution labels stay accurate — only the gate widens.
+  bool get rewardedRequiredForFhd =>
+      _rc?.getBool(_kRewardedRequiredForFhd) ?? _defRewardedRequiredForFhd;
+
+  /// Whether this user must be asked for ad-personalisation consent.
+  ///
+  /// Set through a console *condition* rather than a plain value — Firebase
+  /// resolves the country server-side, which is the only signal here that
+  /// actually knows where the device is. See [ConsentService].
+  bool get consentRequired =>
+      _rc?.getBool(_kConsentRequired) ?? _defConsentRequired;
 }

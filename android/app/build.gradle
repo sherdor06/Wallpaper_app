@@ -60,4 +60,14 @@ android {
     }
 }
 
+// No ad-network dependency here. Yandex Mobile Ads arrives through the
+// yandex_mobileads plugin, whose own build.gradle declares
+// `com.yandex.android:mobileads:8.4.0`.
+//
+// The AppMetrica clash that used to constrain this file is gone with the
+// AppLovin adapter: appmetrica_plugin and the ad SDK both pull
+// AppMetricaLibraryAdapter, but Gradle resolves overlapping *ranges* to the
+// highest match on its own. Only CocoaPods ever needed the exact pin -- see
+// the note in pubspec.yaml.
+
 flutter { source = "../.." }

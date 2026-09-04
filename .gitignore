@@ -32,6 +32,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+# Gradle writes here too; only the root /build/ was ignored, so this
+# directory kept showing up as untracked.
+android/build/
 
 # Symbolication related
 app.*.symbols
@@ -50,6 +53,8 @@ scripts/raw/
 scripts/out/
 scripts/venv/
 scripts/__pycache__/
+scripts/review/
+scripts/.wrangler/
 
 # Android release imzolash kalitlari — HECH QACHON repo'ga qo'shmang
 android/key.properties

@@ -66,6 +66,10 @@ class Wallpaper {
   /// Whether this is a 4K wallpaper (gated behind a rewarded ad to unlock).
   bool get is4k => resolution == '4K';
 
+  /// Whether this is a Full-HD wallpaper. Like [is4k] it can be gated behind a
+  /// rewarded ad — the label stays honest, only the gate widens.
+  bool get isFhd => resolution == 'FHD';
+
   /// Builds a model from catalog JSON.
   ///
   /// URLs can be provided in two ways:

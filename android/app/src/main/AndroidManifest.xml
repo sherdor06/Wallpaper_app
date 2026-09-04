@@ -4,15 +4,15 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
 
     <application
-        android:label="Wallpapers 4K — Free"
+        android:label="Wavely"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- AdMob App ID (real — Android). -->
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-8510304338648685~6456890841" />
+        <!-- No ad-network meta-data here: Yandex Mobile Ads is identified by
+             the ad unit id on each request, unlike AdMob which required its app id
+             in the manifest. -->
 
         <!-- Jonli (video) wallpaper servisi. -->
+
         <service
             android:name="com.sherdor.wallpapers.LiveWallpaperService"
             android:exported="true"
@@ -30,7 +30,11 @@
         <activity
             android:name="com.sherdor.wallpapers.MainActivity"
             android:exported="true"
-            android:theme="@style/LaunchTheme">
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:cupertino_native/cupertino_native.dart';
+import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/material.dart';
 
 import '../services/favorites_service.dart';
+import 'archive_page.dart';
 import 'favorites_tab.dart';
 import 'home_tab.dart';
-import 'search_tab.dart';
 import 'settings_page.dart';
 import 'widgets/ad_banner_placeholder.dart';
 import 'widgets/floating_chrome.dart';
@@ -14,23 +14,27 @@ import 'widgets/glass_nav_bar.dart';
 
 const _accent = Color(0xFF6C5CE7);
 
-/// True on iOS 26+ (where the native Liquid Glass tab bar is available).
-/// [Platform.operatingSystemVersion] is a free-form string, so parse defensively.
-bool get _isIOS26OrAbove {
-  if (!Platform.isIOS) return false;
-  try {
-    final match = RegExp(r'(\d+)').firstMatch(Platform.operatingSystemVersion);
-    if (match == null) return false;
-    return int.parse(match.group(1)!) >= 26;
-  } catch (_) {
-    return false;
-  }
-}
+/// Fraction of the native iOS tab bar's measured height that stays in the
+/// layout. UIKit reports a height that includes home-indicator room at the
+/// bottom, and that room only reads correctly when the bar is the bottom-most
+/// view — which it now is, since the ad banner moved above it. So nothing is
+/// trimmed any more.
+///
+/// It was 0.82 while the banner sat underneath: the bar's reserve was dead
+/// space then, holding it up off the ad. Restore a value below 1.0 only if the
+/// banner ever goes back below the bar.
+///
+/// This is the one number to turn if the bar sits too low (lower it) or starts
+/// clipping its labels (raise it, 1.0 for no trim at all).
+const _iosNavKeep = 1.0;
+
 
 /// Root shell. The bottom navigation is platform-specific:
-///   - iOS 26+  → native Liquid Glass [CNTabBar] (Home/Favorites left, Search split right).
-///   - Android / iOS < 26 → standard Material [NavigationBar].
-/// All other surfaces stay liquid-glass (via liquid_glass_widgets).
+///   - iOS 26+  → native Liquid Glass [CNTabBar].
+///   - iOS < 26 → floating frosted [GlassNavBar].
+///   - Android  → solid [CircleNavBar] (no blur, no jank).
+///
+/// The *contents* of that bar differ by platform too — see [_archiveIsTab].
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -42,12 +46,44 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   int _homeReset = 0; // bumped when Home is selected → resets its category to "All"
 
-  static const _titles = ['Wallpapers', 'Favorites', 'Search'];
+  /// True while the embedded Archive tab is in multi-select. The whole bottom
+  /// chrome yields to it: the page hangs its selection bar off its own Scaffold,
+  /// and with [Scaffold.extendBody] the body runs behind ours, so leaving either
+  /// the ad banner or the nav bar up would bury that bar. Photos does the same.
+  bool _archiveSelecting = false;
+
+  /// iOS carries Archive in the tab bar (Home/Favorites/Archive/Settings);
+  /// Android keeps it on the top chrome and its bar holds three items. Every
+  /// list below is built from this flag so the pages, the nav items and the
+  /// chrome can never drift out of step.
+  bool get _archiveIsTab => Platform.isIOS;
+
+  /// Index of the Settings tab — last on both platforms.
+  int get _settingsIndex => _archiveIsTab ? 3 : 2;
+
+  /// Tabs 0 and 1 are full-bleed grids that scroll under the floating chrome.
+  /// Archive and Settings bring their own [AppBar], so the chrome hides for
+  /// them rather than overlapping their title bars.
+  bool get _gridTab => _index < 2;
+
+  static const _gridTitles = ['Wallpapers', 'Favorites'];
 
   void _select(int i) => setState(() {
         _index = i;
         if (i == 0) _homeReset++;
       });
+
+  List<Widget> get _pages => [
+        HomeTab(resetSignal: _homeReset),
+        // Its empty state offers a way to the catalog, which on both platforms
+        // means switching tab — Favorites is a page in the stack, not a route.
+        FavoritesTab(onBrowse: () => _select(0)),
+        if (_archiveIsTab)
+          ArchivePage(
+            onSelectingChanged: (v) => setState(() => _archiveSelecting = v),
+          ),
+        const SettingsPage(),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -56,100 +92,138 @@ class _HomeShellState extends State<HomeShell> {
       builder: (context, _) {
         return Scaffold(
           // No app bar: the grid fills the whole screen and scrolls behind the
-          // floating chrome (title pill + settings button + bottom nav).
+          // floating chrome (title pill + archive button + bottom nav).
           extendBodyBehindAppBar: true,
           extendBody: true,
           body: Stack(
             children: [
-              IndexedStack(
-                index: _index,
-                children: [
-                  HomeTab(resetSignal: _homeReset),
-                  const FavoritesTab(),
-                  const SearchTab(),
-                ],
-              ),
-              // Floating top chrome: title pill (left) + settings (right),
-              // each its own liquid/solid button — content shows through.
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: Row(
-                      children: [
-                        TitlePill(text: _titles[_index]),
-                        const Spacer(),
-                        ChromeIconButton(
-                          icon: Icons.settings_outlined,
-                          tooltip: 'Settings',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                                builder: (_) => const SettingsPage()),
-                          ),
-                        ),
-                      ],
+              IndexedStack(index: _index, children: _pages),
+              if (_gridTab)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Row(
+                        children: [
+                          TitlePill(text: _gridTitles[_index]),
+                          const Spacer(),
+                          // Android only: on iOS this lives in the tab bar, and
+                          // Settings is a tab on both platforms.
+                          if (!_archiveIsTab)
+                            ChromeIconButton(
+                              icon: Icons.inventory_2_outlined,
+                              tooltip: 'Archive',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) => const ArchivePage()),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
-          // Floating glass nav on top, ad pinned to the very bottom.
-          bottomNavigationBar: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildBottomNav(),
-              Container(
-                width: double.infinity,
-                color: Theme.of(context).scaffoldBackgroundColor,
-                child: const SafeArea(top: false, child: AdBannerPlaceholder()),
-              ),
-            ],
-          ),
+          // Ad above the nav, not below it. The bar is what the user reaches
+          // for constantly, so it keeps the screen edge; putting the ad there
+          // instead parks a tap target the user does not want exactly where
+          // their thumb already lives.
+          //
+          // The bottom inset moves with the position: whichever child sits
+          // last has to clear the gesture bar, and that is now the nav.
+          bottomNavigationBar: _archiveSelecting
+              ? null
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      child: const AdBannerPlaceholder(),
+                    ),
+                    // iOS's native bar reserves the home-indicator room itself
+                    // (see [_iosNavKeep]); wrapping it too would inset twice.
+                    if (Platform.isIOS)
+                      _buildBottomNav()
+                    else
+                      SafeArea(top: false, child: _buildBottomNav()),
+                  ],
+                ),
         );
       },
     );
   }
 
   Widget _buildBottomNav() {
-    // iOS 26+: native Liquid Glass tab bar (Search split to the right, like the screenshot).
-    if (_isIOS26OrAbove) {
-      return CNTabBar(
-        currentIndex: _index,
-        onTap: _select,
-        tint: _accent,
-        height: 85,
-        split: true,
-        rightCount: 1,
-        items: const [
-          CNTabBarItem(label: 'Home', icon: CNSymbol('house.fill')),
-          CNTabBarItem(label: 'Favorites', icon: CNSymbol('heart.fill')),
-          CNTabBarItem(label: 'Search', icon: CNSymbol('magnifyingglass')),
-        ],
+    // A bar with a different item count than [_pages] silently maps taps to the
+    // wrong screen, so tie the two together here rather than trusting the lists
+    // to be edited in step.
+    assert(_pages.length == _settingsIndex + 1);
+
+    // iOS 26+: native Liquid Glass tab bar. Not split — that layout existed to
+    // hang Search off to the right as a round pill, and Search is gone.
+    // Safe to hard-code four items: isIOS26OrAbove implies iOS, which is
+    // exactly when Archive is a tab.
+    if (isIOS26OrAbove) {
+      assert(_archiveIsTab && _pages.length == 4);
+      // No fixed height: the package skips its intrinsic-size measurement
+      // whenever one is given (tab_bar.dart `_requestIntrinsicSize`), and the 85
+      // this used to pass was sized for three items — two labelled plus the
+      // icon-only Search pill. Four labelled items do not fit 85 once the bar's
+      // own home-indicator reserve is taken out of it, so the titles ride up
+      // over the glyphs. Letting the native view report its own height gives
+      // each item the room UIKit thinks it needs.
+      return ClipRect(
+        // Keeps the top of the bar and drops its dead bottom reserve — see
+        // [_iosNavKeep]. Clipping rather than translating matters: a translated
+        // bar would keep its hit box over the banner and swallow ad taps.
+        child: Align(
+          alignment: Alignment.topCenter,
+          heightFactor: _iosNavKeep,
+          child: CNTabBar(
+            currentIndex: _index,
+            onTap: _select,
+            tint: _accent,
+            items: const [
+              CNTabBarItem(label: 'Home', icon: CNSymbol('house.fill')),
+              CNTabBarItem(label: 'Favorites', icon: CNSymbol('heart.fill')),
+              CNTabBarItem(label: 'Archive', icon: CNSymbol('archivebox.fill')),
+              CNTabBarItem(label: 'Settings', icon: CNSymbol('gearshape.fill')),
+            ],
+          ),
+        ),
       );
     }
 
-    const items = [
-      GlassNavItem(
+    final items = <GlassNavItem>[
+      const GlassNavItem(
         icon: Icons.home_outlined,
         activeIcon: Icons.home,
         label: 'Home',
       ),
-      GlassNavItem(
+      const GlassNavItem(
         icon: Icons.favorite_border,
         activeIcon: Icons.favorite,
         label: 'Favorites',
       ),
-      GlassNavItem(
-        icon: Icons.search,
-        activeIcon: Icons.search,
-        label: 'Search',
+      if (_archiveIsTab)
+        const GlassNavItem(
+          icon: Icons.inventory_2_outlined,
+          activeIcon: Icons.inventory_2,
+          label: 'Archive',
+        ),
+      const GlassNavItem(
+        icon: Icons.settings_outlined,
+        activeIcon: Icons.settings,
+        label: 'Settings',
       ),
     ];
+    assert(items.length == _pages.length);
 
     // Android: icon-only solid nav with a sliding accent circle (no blur — no jank).
     if (Platform.isAndroid) {

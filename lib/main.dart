@@ -1,15 +1,21 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:appmetrica_plugin/appmetrica_plugin.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import 'config/app_config.dart';
 import 'firebase_options.dart';
 import 'services/ad_service.dart';
 import 'services/analytics_service.dart';
+import 'services/consent_service.dart';
 import 'services/favorites_service.dart';
+import 'services/history_service.dart';
 import 'services/remote_config_service.dart';
 import 'services/theme_service.dart';
 import 'services/unlock_service.dart';
@@ -26,6 +32,26 @@ Future<void> main() async {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
+  // Yandex AppMetrica — CIS analytics + free install attribution + push. Skipped
+  // when no key is provided (--dart-define=APPMETRICA_API_KEY=...). Crash
+  // reporting stays OFF so Firebase Crashlytics remains the single crash owner
+  // (two native crash handlers would fight over the signal handlers).
+  if (AppConfig.hasAppMetrica) {
+    try {
+      await AppMetrica.activate(
+        AppMetricaConfig(
+          AppConfig.appMetricaApiKey,
+          // Both JVM and native crash reporting off — Firebase Crashlytics is the
+          // single crash owner (two native crash handlers would conflict).
+          crashReporting: false,
+          nativeCrashReporting: false,
+          logs: kDebugMode,
+        ),
+      );
+    } catch (_) {
+      // Analytics init must never block app startup.
+    }
+  }
   // Bound the in-memory image cache so decoding many 4K wallpapers can't OOM.
   PaintingBinding.instance.imageCache.maximumSizeBytes = 100 << 20; // ~100 MB
   // Remove leftover temp download files from earlier runs (fire-and-forget).
@@ -36,12 +62,21 @@ Future<void> main() async {
   if (!Platform.isAndroid) {
     await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
   }
-  // Remote Config first — AdService reads the ad kill switch / frequency from it.
+  // Remote Config first — AdService reads the ad kill switch / frequency from
+  // it, and ConsentService reads the `consent_required` region flag.
   await RemoteConfigService.instance.init();
-  // Initialize AdMob and gather UMP (GDPR) consent before any ads load.
-  await AdService.instance.init();
+  // Then the stored consent answer, so [ConsentService.isRequired] is truthful
+  // by the time the splash finishes and decides whether to ask.
+  await ConsentService.instance.init();
+  // Ad init — deliberately NOT awaited. Nothing on screen needs it: the banner
+  // awaits [AdService.adsAllowed] itself, and every interstitial/rewarded path
+  // is guarded until consent resolves. Awaiting it would put the whole ad stack
+  // on the cold-start critical path — and in the EEA it would block startup for
+  // as long as the consent dialog is on screen, which it waits for.
+  unawaited(AdService.instance.init());
   // Load favorites + unlocked (4K) wallpapers + theme choice from disk.
   await FavoritesService.instance.init();
+  await HistoryService.instance.init();
   await UnlockService.instance.init();
   await ThemeService.instance.init();
   runApp(const WallpaperApp());

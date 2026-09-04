@@ -7,6 +7,20 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 const _accent = Color(0xFF6C5CE7);
 const _accentLight = Color(0xFF8E7BF5);
 
+/// True on iOS 26+, where the native Liquid Glass controls (tab bar, popup
+/// menus) are available. [Platform.operatingSystemVersion] is a free-form
+/// string, so parse defensively.
+bool get isIOS26OrAbove {
+  if (!Platform.isIOS) return false;
+  try {
+    final match = RegExp(r'(\d+)').firstMatch(Platform.operatingSystemVersion);
+    if (match == null) return false;
+    return int.parse(match.group(1)!) >= 26;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Height of the floating top-bar pills (title + settings button).
 const double kTopBarHeight = 44;
 
@@ -18,7 +32,7 @@ const double kTopChrome = kTopBarHeight + 8;
 /// Floating pill showing the current tab title.
 ///
 /// iOS → liquid glass; Android → solid theme-aware pill (no blur — no jank),
-/// styled like [CircleNavBar].
+/// styled like [CircleNavBar]. Both platforms get the orbiting gradient arc.
 class TitlePill extends StatelessWidget {
   final String text;
 
@@ -34,25 +48,25 @@ class TitlePill extends StatelessWidget {
         color: Theme.of(context).colorScheme.onSurface,
       ),
     );
-    if (!Platform.isAndroid) {
-      // A soft gradient arc slowly orbits the pill's border (iOS only).
-      return _OrbitingGlow(
-        child: GlassContainer(
-          height: kTopBarHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          shape: const LiquidRoundedSuperellipse(borderRadius: 22),
-          alignment: Alignment.center,
-          child: label,
-        ),
-      );
-    }
-    return Container(
-      height: kTopBarHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      alignment: Alignment.center,
-      decoration: _solidDecoration(context, radius: 22),
-      child: label,
-    );
+    // The pill body differs per platform (glass vs solid), but the animated
+    // orbiting arc wraps both so Android matches the iOS motion.
+    final Widget pill = Platform.isAndroid
+        ? Container(
+            height: kTopBarHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            alignment: Alignment.center,
+            decoration: _solidDecoration(context, radius: 22),
+            child: label,
+          )
+        : GlassContainer(
+            height: kTopBarHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            shape: const LiquidRoundedSuperellipse(borderRadius: 22),
+            alignment: Alignment.center,
+            child: label,
+          );
+    // A soft gradient arc slowly orbits the pill's border (both platforms).
+    return _OrbitingGlow(child: pill);
   }
 }
 
@@ -64,33 +78,45 @@ class ChromeIconButton extends StatelessWidget {
   final VoidCallback onTap;
   final String? tooltip;
 
+  /// Diameter of the button. Defaults to the top-bar size; pass a larger value
+  /// for a more prominent, easier-to-tap control (e.g. the detail "random" FAB).
+  final double size;
+
+  /// Glyph size. Defaults to ~half the button so it scales with [size].
+  final double? iconSize;
+
   const ChromeIconButton({
     super.key,
     required this.icon,
     required this.onTap,
     this.tooltip,
+    this.size = kTopBarHeight,
+    this.iconSize,
   });
 
   @override
   Widget build(BuildContext context) {
+    final glyph = iconSize ?? size * 0.5;
     Widget button;
     if (!Platform.isAndroid) {
       button = GlassIconButton(
         icon: Icon(icon),
         onPressed: onTap,
-        size: kTopBarHeight,
+        size: size,
+        iconSize: glyph,
       );
     } else {
       final dark = Theme.of(context).brightness == Brightness.dark;
       button = GestureDetector(
         onTap: onTap,
         child: Container(
-          width: kTopBarHeight,
-          height: kTopBarHeight,
-          decoration: _solidDecoration(context, radius: kTopBarHeight / 2),
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: _solidDecoration(context, radius: size / 2),
           child: Icon(
             icon,
-            size: 22,
+            size: glyph,
             color: dark ? Colors.white70 : Colors.black87,
           ),
         ),
@@ -101,8 +127,73 @@ class ChromeIconButton extends StatelessWidget {
   }
 }
 
+/// Floating pill button with a label and an optional leading glyph — the wide
+/// sibling of [ChromeIconButton].
+///
+/// Same platform split as the rest of this file: iOS gets liquid glass (with the
+/// package's press stretch, so it feels like the nav bar it sits under), Android
+/// gets the solid pill, because the glass pipeline is skipped there entirely
+/// (see the `builder` in main.dart) and a lone glass widget would be the only
+/// thing in the app paying for it.
+class ChromePillButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const ChromePillButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: _accent),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (Platform.isAndroid) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: kTopBarHeight,
+          alignment: Alignment.center,
+          decoration: _solidDecoration(context, radius: kTopBarHeight / 2),
+          child: content,
+        ),
+      );
+    }
+    // Null width hugs the label (the package puts it straight on a SizedBox).
+    return GlassButton.custom(
+      onTap: onTap,
+      height: kTopBarHeight,
+      shape: const LiquidRoundedSuperellipse(borderRadius: kTopBarHeight / 2),
+      child: content,
+    );
+  }
+}
+
 /// Continuously rotating gradient arc ("comet") around its [child] — decorates
-/// the iOS title pill. Respects reduced motion (freezes when animations are off).
+/// the title pill on both platforms. Respects reduced motion (freezes when
+/// animations are off).
 class _OrbitingGlow extends StatefulWidget {
   final Widget child;
 
