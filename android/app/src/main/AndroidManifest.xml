@@ -41,6 +41,25 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
+            <!-- Shared wallpaper links. autoVerify makes Android fetch
+                 https://wallpapers-cdn.pages.dev/.well-known/assetlinks.json and,
+                 if this app's signing fingerprint is listed there, open these
+                 URLs directly instead of offering a chooser. Until that file
+                 lists the *Play* signing key (not the upload key), verification
+                 fails and the user gets the chooser -- the link still works,
+                 it just asks first.
+
+                 Keep the host and prefix in step with DeepLinkService. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="wallpapers-cdn.pages.dev"
+                    android:pathPrefix="/w/"/>
+            </intent-filter>
+
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />

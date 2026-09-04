@@ -14,6 +14,7 @@ import 'firebase_options.dart';
 import 'services/ad_service.dart';
 import 'services/analytics_service.dart';
 import 'services/consent_service.dart';
+import 'services/deep_link_service.dart';
 import 'services/favorites_service.dart';
 import 'services/history_service.dart';
 import 'services/remote_config_service.dart';
@@ -82,8 +83,27 @@ Future<void> main() async {
   runApp(const WallpaperApp());
 }
 
-class WallpaperApp extends StatelessWidget {
+class WallpaperApp extends StatefulWidget {
   const WallpaperApp({super.key});
+
+  /// Shared links arrive from outside the widget tree, so the service that
+  /// handles them needs a way to push without a BuildContext.
+  static final navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  State<WallpaperApp> createState() => _WallpaperAppState();
+}
+
+class _WallpaperAppState extends State<WallpaperApp> {
+  @override
+  void initState() {
+    super.initState();
+    // After the first frame: a link that launched the app is replayed here, and
+    // pushing onto a navigator that has not mounted yet would be dropped.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DeepLinkService.instance.init(WallpaperApp.navigatorKey);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +112,7 @@ class WallpaperApp extends StatelessWidget {
       listenable: ThemeService.instance,
       builder: (context, _) {
         return MaterialApp(
+          navigatorKey: WallpaperApp.navigatorKey,
           debugShowCheckedModeBanner: false,
           title: 'Wallpapers',
           theme: _theme(Brightness.light),

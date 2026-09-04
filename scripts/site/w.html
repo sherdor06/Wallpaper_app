@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wavely</title>
+<!-- Served for every /w/<id> path via the _redirects rewrite, so the id is read
+     from the URL rather than baked in -- one page instead of 1400 of them.
+
+     This page only ever renders for someone WITHOUT the app: with it installed
+     and the domain verified, Android hands the URL straight to Wavely and the
+     browser is never opened. So the whole job here is: show the wallpaper so
+     the link looks like something, and send them to the store. -->
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column;
+         align-items:center; justify-content:center; gap:22px; padding:28px;
+         background:#0E0E12; color:#fff; text-align:center;
+         font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  img { width:min(300px,72vw); aspect-ratio:9/19.5; object-fit:cover;
+        border-radius:22px; background:#1b1b22;
+        box-shadow:0 18px 50px rgba(0,0,0,.55); }
+  h1 { font-size:21px; margin:0; font-weight:600; }
+  p  { margin:0; color:#9b9ba6; font-size:14px; max-width:30ch; }
+  a.cta { display:inline-block; text-decoration:none; background:#6C5CE7;
+          color:#fff; font-weight:600; padding:14px 30px; border-radius:14px; }
+</style>
+<img id="shot" alt="">
+<h1 id="title">Wavely</h1>
+<p>Open this wallpaper in Wavely — 4K wallpapers, free.</p>
+<a class="cta" href="https://play.google.com/store/apps/details?id=com.sherdor.wallpapers">Get it on Google Play</a>
+<script>
+  // /w/nature/tg_18493  ->  nature/tg_18493
+  var id = decodeURIComponent(location.pathname.replace(/^\/w\//, ''));
+  if (id) {
+    var img = document.getElementById('shot');
+    img.src = '/' + id + '_thumb.webp';
+    // A deleted wallpaper should still show a working store link, not a
+    // broken-image icon.
+    img.onerror = function () { img.remove(); };
+    var last = id.split('/').pop().replace(/[_-]+/g, ' ').trim();
+    if (last) document.getElementById('title').textContent =
+      last.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+</script>

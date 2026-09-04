@@ -38,6 +38,7 @@ python review_serve.py                                    # http://127.0.0.1:876
 # 3. Publish the kept images.
 python process_images.py        # raw/ → out/ (webp full + thumb)
 python generate_catalog.py      # out/catalog.json
+cp -R site/. out/   # w.html, _redirects, .well-known -- site/ manba, out/ ignore'da
 npx wrangler pages deploy out --project-name=wallpapers-cdn --branch=main --commit-dirty=true
 ```
 Deploy takes a few minutes and sometimes fails with an empty "Failed to upload"
@@ -49,6 +50,7 @@ Mark bad wallpapers as favourites in the running app, then:
 FAV=$(find ~/Library/Developer/CoreSimulator/Devices -name favorites.json -path '*Application Support*')
 python delete_favorites.py --from-favorites "$FAV"        # R2 + local + blocklist
 python generate_catalog.py
+cp -R site/. out/   # w.html, _redirects, .well-known -- site/ manba, out/ ignore'da
 npx wrangler pages deploy out --project-name=wallpapers-cdn --branch=main --commit-dirty=true
 ```
 Gotcha: a running app re-writes old favourites from memory — close & reopen it
@@ -60,3 +62,34 @@ before favouriting so already-deleted keys don't reappear.
 - The older ~839 raw/ images were fetched with a category-shift bug → some are
   mis-tagged (future re-tag cleanup).
 - Cloudflare Pages limits: 20,000 files/deploy (currently ~2000), 25 MB/file.
+
+## D. Share havolalari (App Links)
+
+`out/` ichida uchta fayl shu ish uchun turadi va kontent bilan birga deploy
+bo'ladi:
+
+Manbasi `scripts/site/` da turadi (kuzatiladi); `out/` gitignore'da, shuning
+uchun deploy'dan oldin `cp -R site/. out/` bilan nusxalanadi.
+
+| Fayl | Vazifasi |
+|------|----------|
+| `w.html` | Ilova o'rnatilmagan odam ko'radigan sahifa — rasm + Play tugmasi |
+| `_redirects` | `/w/*` ni `w.html` ga qayta yozadi (200), URL o'zgarmaydi |
+| `.well-known/assetlinks.json` | Android'ga "bu domen shu ilovaga ishonadi" deydi |
+
+**assetlinks.json to'ldirilmaguncha App Links ishlamaydi** — havola bosilganda
+Android to'g'ridan-to'g'ri ilovani ochish o'rniga tanlov oynasini ko'rsatadi.
+Kerakli barmoq izi:
+
+> Play Console -> Test and release -> Setup -> **App integrity** ->
+> *App signing key certificate* -> **SHA-256 certificate fingerprint**
+
+Bu Google qayta imzolaydigan kalit; upload kaliti emas. Sideload qilingan
+release APK ham to'g'ridan-to'g'ri ochilishi kerak bo'lsa, ro'yxatga upload
+kalitining SHA-256 ini ham qo'shing (ikkalasi bir massivda tura oladi).
+
+Tekshirish (deploy'dan keyin):
+```bash
+curl -s https://wallpapers-cdn.pages.dev/.well-known/assetlinks.json
+adb shell pm get-app-links com.sherdor.wallpapers   # "verified" ko'rinishi kerak
+```

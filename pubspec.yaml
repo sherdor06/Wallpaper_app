@@ -63,6 +63,8 @@ dependencies:
   # network-agnostic public surface, so putting mediation back later is a
   # change to that one file, not to the UI.
   yandex_mobileads: ^8.4.0
+  share_plus: ^12.0.2
+  app_links: ^7.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

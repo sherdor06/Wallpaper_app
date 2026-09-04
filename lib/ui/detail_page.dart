@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../data/wallpaper_repository.dart';
 import '../models/wallpaper.dart';
@@ -15,6 +16,7 @@ import '../services/favorites_service.dart';
 import '../services/history_service.dart';
 import '../services/image_cache.dart';
 import '../services/remote_config_service.dart';
+import '../services/deep_link_service.dart';
 import '../services/unlock_service.dart';
 import '../services/wallpaper_service.dart';
 import 'widgets/badges.dart';
@@ -115,6 +117,28 @@ class _DetailPageState extends State<DetailPage> {
 
   /// A gated wallpaper the user hasn't paid for yet — a rewarded ad comes first.
   bool get _locked => _gated && !UnlockService.instance.isUnlocked(_w.id);
+
+  /// Shares a link to this wallpaper.
+  ///
+  /// Sends the URL, not the image file. A file lands in the friend's gallery
+  /// and ends there; a link opens this wallpaper in their copy of the app, or
+  /// sends them to the store to get one — which is the only version of sharing
+  /// that brings anyone back.
+  Future<void> _share() async {
+    final url = DeepLinkService.shareUrlFor(_w.id);
+    // The sheet wants an origin rect on iPad or it throws; on a phone the
+    // button's own box is the natural anchor.
+    final box = context.findRenderObject() as RenderBox?;
+    await SharePlus.instance.share(
+      ShareParams(
+        uri: url,
+        subject: _w.title,
+        sharePositionOrigin:
+            box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+      ),
+    );
+    AnalyticsService.logShare(_w.id);
+  }
 
   /// Ensures a gated wallpaper is unlocked (via a rewarded ad) before
   /// proceeding. Grants access when ads are unavailable, so a missing or failed
@@ -499,6 +523,11 @@ class _DetailPageState extends State<DetailPage> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+              ),
+              IconButton(
+                tooltip: 'Share',
+                icon: const Icon(Icons.ios_share, color: Colors.white),
+                onPressed: _share,
               ),
               IconButton(
                 tooltip: 'Download',

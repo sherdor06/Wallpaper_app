@@ -1,0 +1,5 @@
+# Every shared wallpaper link renders from one page; w.html reads the id out of
+# the path. Status 200 rewrites instead of redirecting, so the URL the friend
+# sees stays the one that was shared -- which is also the URL Android matches
+# against the App Links intent filter.
+/w/*  /w.html  200

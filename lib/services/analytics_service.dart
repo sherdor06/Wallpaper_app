@@ -45,6 +45,13 @@ class AnalyticsService {
     _log('wallpaper_download', <String, Object>{'wallpaper_id': id});
   }
 
+  /// A share sheet was opened for a wallpaper. Logged on open, not on send —
+  /// the platform sheet never tells the app whether anything was actually sent,
+  /// so this counts intent, and the arrivals show up as app-link opens.
+  static void logShare(String id) {
+    _log('wallpaper_share', <String, Object>{'wallpaper_id': id});
+  }
+
   static void logRewardedUnlock(String id) {
     _log('rewarded_unlock', <String, Object>{'wallpaper_id': id});
   }
