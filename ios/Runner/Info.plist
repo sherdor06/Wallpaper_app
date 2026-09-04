@@ -2,13 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
-		<!-- No ad-network app id here: AppLovin MAX takes its SDK key at runtime
-		     (AdService._sdkKey), unlike AdMob which required GADApplicationIdentifier
-		     in this file. Mediated networks configure themselves from the dashboard.
+		<!-- No ad-network app id here: Yandex Mobile Ads is identified by the ad
+		     unit id on each request, unlike AdMob which required
+		     GADApplicationIdentifier in this file.
 
 		     SKAdNetworkItems below still matters — it is the attribution allowlist
-		     for every network that may serve, so it needs AppLovin's and Yandex's
-		     ids, not only the AdMob-era ones. See the note on that key. -->
+		     for every network that may serve. The list is inherited from the AdMob
+		     era and is wider than a Yandex-only app needs; extra entries are
+		     harmless, but Yandex's own ids must be present before the iOS build
+		     ships. See the note on that key. -->
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>Saves wallpapers to your photo library.</string>
 		<!-- App Tracking Transparency: shown before requesting personalized ads. -->

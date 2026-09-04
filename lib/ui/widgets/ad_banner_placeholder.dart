@@ -1,16 +1,26 @@
-import 'package:applovin_max/applovin_max.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:yandex_mobileads/mobile_ads.dart';
 
 import '../../services/ad_service.dart';
 
 /// Bottom banner (always shown — ads are the only monetization).
 ///
-/// [MaxAdView] is a real widget rather than an overlay, so it sits in the
-/// Scaffold's bottom column like any other child; MAX's own `createBanner`
-/// pins to the screen edge and would float over the nav bar instead.
+/// [AdWidget] is a real widget rather than an overlay, so it sits in the
+/// Scaffold's bottom column like any other child and the nav bar rests directly
+/// on top of it.
 ///
-/// While the banner loads (or if it fails) a neutral placeholder of the same
-/// height keeps the layout from shifting — the nav bar sits directly above it.
+/// A sticky banner sizes itself from the container width, and the SDK can be
+/// asked for that height before any ad exists — so the strip is reserved up
+/// front and nothing above it jumps when the ad arrives. While the banner loads
+/// (or if it fails) a neutral placeholder of the same height fills it.
+///
+/// The [AdWidget] is mounted the moment the ad object exists, not once it has
+/// loaded. That order is load-bearing: `BannerAd.load` only sends its request
+/// from the platform view's creation callback, so a widget that waited for
+/// "loaded" before mounting the view would wait forever. Until the ad paints,
+/// the view is 1dp tall and sits invisibly over the placeholder.
 class AdBannerPlaceholder extends StatefulWidget {
   const AdBannerPlaceholder({super.key});
 
@@ -19,20 +29,30 @@ class AdBannerPlaceholder extends StatefulWidget {
 }
 
 class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
-  /// Standard MAX banner height. Fixed so the placeholder and the loaded ad
-  /// occupy the same space.
-  static const _height = 50.0;
+  /// Height used until the SDK reports the real one. Matches a standard banner,
+  /// so the reserved strip is close even before the answer arrives.
+  static const _fallbackHeight = 50.0;
 
-  bool _allowed = false;
-  bool _failed = false;
+  /// Unlike a mediation layer, this SDK does not keep retrying behind the view:
+  /// a failed load stays failed until asked again. Without a retry a single
+  /// no-fill at startup would mean no banner for the whole session — so retry a
+  /// few times, slowly enough not to look like a hammering client.
+  static const _retryAfter = Duration(seconds: 60);
+  static const _maxAttempts = 3;
+
+  BannerAd? _ad;
+  Timer? _retryTimer;
+  int _attempts = 0;
+  int? _reservedHeight;
+  bool _loaded = false;
+  bool _setupStarted = false;
 
   /// Null until [AdService.adsAllowed] answers. `false` means no ad will ever
-  /// arrive in this session — the SDK is off, or its credentials are still
-  /// placeholders — and the widget collapses instead of reserving space.
+  /// arrive in this session — the SDK is off, or this platform has no unit ids —
+  /// and the widget collapses instead of reserving space.
   ///
-  /// That distinction matters for shipping ahead of the ad network: the app can
-  /// go to the store before AppLovin approves it, and users must not be left
-  /// looking at an empty grey strip where a banner will one day be.
+  /// That distinction matters while iOS is still unconfigured: users there must
+  /// not be left looking at an empty grey strip where a banner will one day be.
   bool? _adsPossible;
 
   @override
@@ -40,14 +60,72 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     super.initState();
     // Skip entirely when ads are hidden (e.g. store screenshots).
     if (AdService.adsHidden) return;
-    // Wait until the SDK is up and consent is resolved before mounting the view.
+    // Wait until the SDK is up and consent is applied before requesting.
     AdService.instance.adsAllowed.then((allowed) {
       if (!mounted) return;
-      setState(() {
-        _adsPossible = allowed;
-        _allowed = allowed;
-      });
+      setState(() => _adsPossible = allowed);
+      if (allowed) unawaited(_setup());
     });
+  }
+
+  /// Reserves the banner's height, then kicks off the first load.
+  Future<void> _setup() async {
+    if (_setupStarted) return;
+    _setupStarted = true;
+
+    final width = MediaQuery.of(context).size.width.truncate();
+    final size = BannerAdSize.sticky(width: width);
+    try {
+      final height = await size.getCalculatedHeight();
+      if (!mounted) return;
+      setState(() => _reservedHeight = height);
+    } catch (_) {
+      // Keep [_fallbackHeight]; a few pixels off beats no banner at all.
+    }
+
+    final ad = BannerAd(adSize: size);
+    ad.loadStateStream.listen(_onLoadState);
+    _ad = ad;
+    await _load();
+  }
+
+  Future<void> _load() async {
+    final ad = _ad;
+    if (ad == null || !mounted) return;
+    _attempts++;
+    try {
+      await ad.load(AdRequest(adUnitId: AdService.instance.bannerUnitId));
+    } catch (_) {
+      _onFailed();
+    }
+  }
+
+  void _onLoadState(BannerAdLoadState state) {
+    if (!mounted) return;
+    if (state is BannerAdLoadStateLoaded) {
+      _retryTimer?.cancel();
+      setState(() {
+        _loaded = true;
+        _reservedHeight = state.height;
+      });
+    } else if (state is BannerAdLoadStateError) {
+      _onFailed();
+    }
+  }
+
+  void _onFailed() {
+    if (!mounted) return;
+    setState(() => _loaded = false);
+    if (_attempts >= _maxAttempts) return;
+    _retryTimer?.cancel();
+    _retryTimer = Timer(_retryAfter, _load);
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    _ad?.destroy();
+    super.dispose();
   }
 
   @override
@@ -57,34 +135,24 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     // Resolved to "never" -> same, no dead strip at the bottom of the screen.
     if (_adsPossible == false) return const SizedBox.shrink();
 
-    if (_allowed && !_failed) {
-      return SizedBox(
-        height: _height,
-        child: MaxAdView(
-          adUnitId: AdService.instance.bannerUnitId,
-          adFormat: AdFormat.banner,
-          listener: AdViewAdListener(
-            onAdLoadedCallback: (_) {
-              if (_failed && mounted) setState(() => _failed = false);
-            },
-            // No fill: fall back to the placeholder rather than leaving a hole.
-            // MAX keeps retrying behind the view, so a later fill recovers.
-            onAdLoadFailedCallback: (_, __) {
-              if (mounted) setState(() => _failed = true);
-            },
-            onAdClickedCallback: (_) {},
-            onAdExpandedCallback: (_) {},
-            onAdCollapsedCallback: (_) {},
-          ),
-        ),
-      );
-    }
-
-    return _placeholder();
+    final height = _reservedHeight?.toDouble() ?? _fallbackHeight;
+    final ad = _ad;
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Underneath until the ad has painted over it (see the class note).
+          if (!_loaded) _placeholder(height),
+          if (ad != null) AdWidget(bannerAd: ad),
+        ],
+      ),
+    );
   }
 
-  Widget _placeholder() => Container(
-        height: _height,
+  Widget _placeholder(double height) => Container(
+        height: height,
         width: double.infinity,
         color: Colors.white10,
         alignment: Alignment.center,

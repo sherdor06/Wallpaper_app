@@ -48,15 +48,21 @@ dependencies:
   firebase_analytics: ^12.4.4
   firebase_crashlytics: ^5.2.5
   firebase_remote_config: ^6.5.4
-  # Pinned exactly, not a caret range. AppMetrica and the Yandex ad network both
-  # depend on AppMetricaLibraryAdapter, and their allowed ranges only overlap on
-  # 6.5.x: the AppLovin Yandex adapter asks for `~> 6.5.0` (< 6.6), while
-  # appmetrica_plugin 4.1.0 raised its floor to `~> 6.6`. Any caret range here
-  # resolves to 4.1.0 and CocoaPods then refuses to install at all.
-  # Before bumping this, check the adapter's podspec in ios/Podfile.
+  # Still pinned exactly, but the original reason is gone: the pin existed to
+  # satisfy the AppLovin Yandex adapter's `AppMetricaLibraryAdapter ~> 6.5.0`,
+  # and that adapter left with AppLovin. YandexMobileAds 8.4.0 now pulls the
+  # adapter directly and may want a newer floor than 4.0.0 provides. Android
+  # resolves this on its own (Gradle takes the highest version in range); if
+  # CocoaPods ever refuses to install, bump this to 4.1.0 rather than fighting
+  # the constraint — nothing pins it low any more.
   appmetrica_plugin: 4.0.0        # Yandex AppMetrica (MDH analitika + atribusiya + push)
   app_tracking_transparency: ^2.0.7
-  applovin_max: ^4.6.4
+  # Yandex Mobile Ads, used directly rather than through a mediation layer.
+  # The app's audience is CIS, where Yandex carries the demand; MAX was dropped
+  # because its publisher account never opened. AdService keeps a
+  # network-agnostic public surface, so putting mediation back later is a
+  # change to that one file, not to the UI.
+  yandex_mobileads: ^8.4.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

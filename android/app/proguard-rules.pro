@@ -1,12 +1,9 @@
 # Keep Flutter embedding + platform-channel entry points.
 -keep class io.flutter.** { *; }
 
-# AppLovin MAX + mediated networks. The SDKs ship their own consumer rules, so
-# nothing needs keeping here — but AppLovin's bundled Open Measurement library
-# calls into Amazon's PrivacyPass attestation, which only exists when the Amazon
-# adapter is included. It isn't, and those call sites are unreachable, so R8's
-# missing-class errors are silenced rather than pulling in an unused SDK.
--dontwarn com.amazon.privacypass.**
+# Yandex Mobile Ads ships its own consumer ProGuard rules, so nothing needs
+# keeping here. The `-dontwarn com.amazon.privacypass.**` line that used to sit
+# here belonged to AppLovin's Open Measurement library and left with it.
 
 # App's Kotlin classes invoked from the native side (MainActivity / LiveWallpaperService).
 -keep class com.sherdor.wallpapers.** { *; }

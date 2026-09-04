@@ -54,7 +54,7 @@ Download Wallpapers 4K now and give your screen a new look every day!
 
 ## Play Console'da kerak bo'ladigan javoblar
 
-- **Privacy policy URL:** `https://pub-5fa9490de235468da94d96af1e8dfa7a.r2.dev/privacy_policy.html`
+- **Privacy policy URL:** `https://wallpapers-cdn.pages.dev/privacy`
   (keyin custom domenga ko'chirsangiz URL'ni yangilang)
 - **Ads:** Yes, contains ads (AdMob)
 - **In-app purchases:** No

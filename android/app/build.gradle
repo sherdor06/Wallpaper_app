@@ -60,28 +60,14 @@ android {
     }
 }
 
-dependencies {
-    // Mediated networks for AppLovin MAX. Each adapter bundles the network's own
-    // SDK; MAX loads whichever ones the dashboard has enabled, so adding an
-    // adapter here without switching the network on in the dashboard does
-    // nothing but add weight.
-    //
-    // Yandex first because it carries this app's CIS audience — MAX's own
-    // demand is thin there, and that region is where most installs land.
-    //
-    // 8.0.0.0 specifically, not the newest. AppMetrica ships in this app twice —
-    // once through appmetrica_plugin, once underneath the Yandex ad SDK — and
-    // the ad SDK pins its copy *strictly*:
-    //
-    //   adapter 8.0.0.0 -> mobileads 8.0.0 -> analytics [8.0.0, 9.0.0)   OK
-    //   adapter 8.1.0.0 ->                    analytics [8.1.0, 9.0.0)
-    //   adapter 8.3.0.0 ->                    analytics [8.3.0, 9.0.0)
-    //
-    // appmetrica_plugin 4.0.0 (pinned in pubspec.yaml, for the iOS side of the
-    // same clash) brings analytics 8.0.0, so anything above 8.0.0.0 fails to
-    // resolve. The iOS Podfile is on 8.3.0 because CocoaPods resolves a
-    // different artifact there — the two are expected to differ.
-    implementation "com.applovin.mediation:yandex-adapter:8.0.0.0"
-}
+// No ad-network dependency here. Yandex Mobile Ads arrives through the
+// yandex_mobileads plugin, whose own build.gradle declares
+// `com.yandex.android:mobileads:8.4.0`.
+//
+// The AppMetrica clash that used to constrain this file is gone with the
+// AppLovin adapter: appmetrica_plugin and the ad SDK both pull
+// AppMetricaLibraryAdapter, but Gradle resolves overlapping *ranges* to the
+// highest match on its own. Only CocoaPods ever needed the exact pin -- see
+// the note in pubspec.yaml.
 
 flutter { source = "../.." }

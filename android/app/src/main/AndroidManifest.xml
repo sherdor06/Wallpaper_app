@@ -7,10 +7,9 @@
         android:label="Wavely"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- No ad-network meta-data here: AppLovin MAX takes its SDK key at
-             runtime (AdService._sdkKey), unlike AdMob which required its app id
-             in the manifest. Mediated networks configure themselves from the
-             MAX dashboard. -->
+        <!-- No ad-network meta-data here: Yandex Mobile Ads is identified by
+             the ad unit id on each request, unlike AdMob which required its app id
+             in the manifest. -->
 
         <!-- Jonli (video) wallpaper servisi. -->
 
