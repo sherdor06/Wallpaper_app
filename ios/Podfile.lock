@@ -1,4 +1,6 @@
 PODS:
+  - app_links (7.0.0):
+    - Flutter
   - app_tracking_transparency (0.0.1):
     - Flutter
   - appmetrica_plugin (4.0.0):
@@ -263,6 +265,8 @@ PODS:
   - PromisesObjC (2.4.1)
   - PromisesSwift (2.4.1):
     - PromisesObjC (= 2.4.1)
+  - share_plus (0.0.1):
+    - Flutter
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
@@ -281,6 +285,7 @@ PODS:
     - AppMetricaLibraryAdapter (>= 6.6.0, ~> 6.6)
 
 DEPENDENCIES:
+  - app_links (from `.symlinks/plugins/app_links/ios`)
   - app_tracking_transparency (from `.symlinks/plugins/app_tracking_transparency/ios`)
   - appmetrica_plugin (from `.symlinks/plugins/appmetrica_plugin/ios`)
   - cupertino_native_better (from `.symlinks/plugins/cupertino_native_better/ios`)
@@ -291,6 +296,7 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
+  - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
   - yandex_mobileads (from `.symlinks/plugins/yandex_mobileads/ios`)
@@ -344,6 +350,8 @@ SPEC REPOS:
     - YandexMobileAds
 
 EXTERNAL SOURCES:
+  app_links:
+    :path: ".symlinks/plugins/app_links/ios"
   app_tracking_transparency:
     :path: ".symlinks/plugins/app_tracking_transparency/ios"
   appmetrica_plugin:
@@ -364,6 +372,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/package_info_plus/ios"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
+  share_plus:
+    :path: ".symlinks/plugins/share_plus/ios"
   sqflite_darwin:
     :path: ".symlinks/plugins/sqflite_darwin/darwin"
   url_launcher_ios:
@@ -372,6 +382,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/yandex_mobileads/ios"
 
 SPEC CHECKSUMS:
+  app_links: a754cbec3c255bd4bbb4d236ecc06f28cd9a7ce8
   app_tracking_transparency: 3d84f147f67ca82d3c15355c36b1fa6b66ca7c92
   appmetrica_plugin: 9e361bd8fbe26c65bddf660594c4c472606ad29e
   AppMetricaAdSupport: d7b09222d59c2b43555e9fe55ff290467e13f1cf
@@ -425,6 +436,7 @@ SPEC CHECKSUMS:
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   PromisesSwift: 217dea0fd5d2ad65222a109c48698add13cc1c5b
+  share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   SVGKit: 1ad7513f8c74d9652f94ed64ddecda1a23864dea
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b

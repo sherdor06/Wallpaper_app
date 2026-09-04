@@ -1,11 +1,13 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.sherdor.wallpapers",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_PLAY_APP_SIGNING_SHA256"
+        "80:8E:0A:6C:ED:A0:21:E6:C3:82:9C:5B:AB:B4:6E:08:6C:30:71:DB:E0:29:0C:02:1A:FB:2D:18:56:74:EB:12"
       ]
     }
   }
