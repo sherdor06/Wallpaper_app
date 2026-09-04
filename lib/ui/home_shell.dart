@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/material.dart';
 
-import '../services/favorites_service.dart';
 import 'archive_page.dart';
 import 'favorites_tab.dart';
 import 'home_tab.dart';
@@ -87,75 +86,75 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: FavoritesService.instance,
-      builder: (context, _) {
-        return Scaffold(
-          // No app bar: the grid fills the whole screen and scrolls behind the
-          // floating chrome (title pill + archive button + bottom nav).
-          extendBodyBehindAppBar: true,
-          extendBody: true,
-          body: Stack(
-            children: [
-              IndexedStack(index: _index, children: _pages),
-              if (_gridTab)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Row(
-                        children: [
-                          TitlePill(text: _gridTitles[_index]),
-                          const Spacer(),
-                          // Android only: on iOS this lives in the tab bar, and
-                          // Settings is a tab on both platforms.
-                          if (!_archiveIsTab)
-                            ChromeIconButton(
-                              icon: Icons.inventory_2_outlined,
-                              tooltip: 'Archive',
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                    builder: (_) => const ArchivePage()),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+    // No ListenableBuilder here on purpose. This used to rebuild the whole
+    // shell — every page in the IndexedStack, the nav bar and the ad banner —
+    // on every favourite toggle, while using nothing from FavoritesService but
+    // a static heart icon in the nav. The two places that actually care listen
+    // for themselves: FavoritesTab for its list, and the heart on each tile.
+    return Scaffold(
+      // No app bar: the grid fills the whole screen and scrolls behind the
+      // floating chrome (title pill + archive button + bottom nav).
+      extendBodyBehindAppBar: true,
+      extendBody: true,
+      body: Stack(
+        children: [
+          IndexedStack(index: _index, children: _pages),
+          if (_gridTab)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Row(
+                    children: [
+                      TitlePill(text: _gridTitles[_index]),
+                      const Spacer(),
+                      // Android only: on iOS this lives in the tab bar, and
+                      // Settings is a tab on both platforms.
+                      if (!_archiveIsTab)
+                        ChromeIconButton(
+                          icon: Icons.inventory_2_outlined,
+                          tooltip: 'Archive',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const ArchivePage()),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-            ],
-          ),
-          // Ad above the nav, not below it. The bar is what the user reaches
-          // for constantly, so it keeps the screen edge; putting the ad there
-          // instead parks a tap target the user does not want exactly where
-          // their thumb already lives.
-          //
-          // The bottom inset moves with the position: whichever child sits
-          // last has to clear the gesture bar, and that is now the nav.
-          bottomNavigationBar: _archiveSelecting
-              ? null
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      child: const AdBannerPlaceholder(),
-                    ),
-                    // iOS's native bar reserves the home-indicator room itself
-                    // (see [_iosNavKeep]); wrapping it too would inset twice.
-                    if (Platform.isIOS)
-                      _buildBottomNav()
-                    else
-                      SafeArea(top: false, child: _buildBottomNav()),
-                  ],
+              ),
+            ),
+        ],
+      ),
+      // Ad above the nav, not below it. The bar is what the user reaches
+      // for constantly, so it keeps the screen edge; putting the ad there
+      // instead parks a tap target the user does not want exactly where
+      // their thumb already lives.
+      //
+      // The bottom inset moves with the position: whichever child sits
+      // last has to clear the gesture bar, and that is now the nav.
+      bottomNavigationBar: _archiveSelecting
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  child: const AdBannerPlaceholder(),
                 ),
-        );
-      },
+                // iOS's native bar reserves the home-indicator room itself
+                // (see [_iosNavKeep]); wrapping it too would inset twice.
+                if (Platform.isIOS)
+                  _buildBottomNav()
+                else
+                  SafeArea(top: false, child: _buildBottomNav()),
+              ],
+            ),
     );
   }
 

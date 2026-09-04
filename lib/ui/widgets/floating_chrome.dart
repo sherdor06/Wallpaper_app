@@ -214,7 +214,7 @@ class _OrbitingGlowState extends State<_OrbitingGlow>
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Respect the system reduced-motion setting.
-    if (MediaQuery.of(context).disableAnimations) {
+    if (MediaQuery.disableAnimationsOf(context)) {
       _controller.stop();
     } else if (!_controller.isAnimating) {
       _controller.repeat();

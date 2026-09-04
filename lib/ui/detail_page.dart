@@ -67,7 +67,14 @@ class DetailPage extends StatefulWidget {
 
 class _DetailPageState extends State<DetailPage> {
   bool _busy = false;
-  double _progress = 0;
+  /// Download progress, held outside setState on purpose.
+  ///
+  /// Dio reports progress many times a second. Routing that through setState
+  /// rebuilt this entire page — the full-bleed 4K image, every badge, both
+  /// button stacks — for a number that only two small widgets read. A notifier
+  /// keeps the ticks where they belong: the fill bar and the percentage repaint,
+  /// nothing else does.
+  final ValueNotifier<double> _progress = ValueNotifier<double>(0);
   final Random _rng = Random();
 
   /// Immersive preview: tapping the image hides all chrome and the system bars
@@ -140,6 +147,7 @@ class _DetailPageState extends State<DetailPage> {
   @override
   void dispose() {
     _holdTimer?.cancel();
+    _progress.dispose();
     // Restore the system bars when leaving the preview.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -227,7 +235,7 @@ class _DetailPageState extends State<DetailPage> {
     _setSaveState(_SaveState.downloading);
     setState(() {
       _busy = true;
-      _progress = 0;
+      _progress.value = 0;
       _activeTarget = target; // the fill runs in the button that was tapped
     });
     try {
@@ -235,7 +243,9 @@ class _DetailPageState extends State<DetailPage> {
         _w,
         target: target,
         onProgress: (p) {
-          if (mounted) setState(() => _progress = p);
+          // Still guarded: the download outlives the page if the user backs out
+          // mid-transfer, and writing to a disposed notifier throws.
+          if (mounted) _progress.value = p;
         },
       );
       AnalyticsService.logWallpaperSet(_w.id, target: target.value);
@@ -266,13 +276,15 @@ class _DetailPageState extends State<DetailPage> {
     if (!mounted) return; // see _applyImage — the ad gives the user time to leave
     setState(() {
       _busy = true;
-      _progress = 0;
+      _progress.value = 0;
     });
     try {
       await WallpaperService.instance.downloadToGallery(
         _w,
         onProgress: (p) {
-          if (mounted) setState(() => _progress = p);
+          // Still guarded: the download outlives the page if the user backs out
+          // mid-transfer, and writing to a disposed notifier throws.
+          if (mounted) _progress.value = p;
         },
       );
       AnalyticsService.logWallpaperDownload(_w.id);
@@ -297,13 +309,15 @@ class _DetailPageState extends State<DetailPage> {
     _setSaveState(_SaveState.downloading);
     setState(() {
       _busy = true;
-      _progress = 0;
+      _progress.value = 0;
     });
     try {
       await WallpaperService.instance.downloadToGallery(
         _w,
         onProgress: (p) {
-          if (mounted) setState(() => _progress = p);
+          // Still guarded: the download outlives the page if the user backs out
+          // mid-transfer, and writing to a disposed notifier throws.
+          if (mounted) _progress.value = p;
         },
       );
       AnalyticsService.logWallpaperDownload(_w.id);
@@ -330,13 +344,15 @@ class _DetailPageState extends State<DetailPage> {
     if (!mounted) return; // see _applyImage — the ad gives the user time to leave
     setState(() {
       _busy = true;
-      _progress = 0;
+      _progress.value = 0;
     });
     try {
       await WallpaperService.instance.setLiveWallpaper(
         _w,
         onProgress: (p) {
-          if (mounted) setState(() => _progress = p);
+          // Still guarded: the download outlives the page if the user backs out
+          // mid-transfer, and writing to a disposed notifier throws.
+          if (mounted) _progress.value = p;
         },
       );
       AnalyticsService.logWallpaperSet(_w.id, target: 'live');
@@ -364,8 +380,8 @@ class _DetailPageState extends State<DetailPage> {
     const fade = Duration(milliseconds: 200);
     // Decode the preview only at screen resolution, not full 4K — this keeps
     // memory low and avoids OOM crashes on very large wallpapers.
-    final decodeWidth = (MediaQuery.of(context).size.width *
-            MediaQuery.of(context).devicePixelRatio)
+    final decodeWidth = (MediaQuery.sizeOf(context).width *
+            MediaQuery.devicePixelRatioOf(context))
         .round()
         .clamp(720, 1600);
     return Scaffold(
@@ -424,7 +440,7 @@ class _DetailPageState extends State<DetailPage> {
           // liquid glass on iOS, simple solid circle on Android.
           Positioned(
             right: 20,
-            bottom: MediaQuery.of(context).padding.bottom + 224,
+            bottom: MediaQuery.paddingOf(context).bottom + 224,
             child: IgnorePointer(
               ignoring: _immersive,
               child: AnimatedOpacity(
@@ -661,14 +677,21 @@ class _DetailPageState extends State<DetailPage> {
                   Positioned.fill(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: _progress.clamp(0.0, 1.0),
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: _progress,
+                        // The gradient never changes, so it is built once and
+                        // handed through as the unchanging child.
                         child: Container(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
                                 colors: [_accent, _accentLight]),
                           ),
+                        ),
+                        builder: (context, value, child) =>
+                            FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: value.clamp(0.0, 1.0),
+                          child: child,
                         ),
                       ),
                     ),
@@ -752,12 +775,15 @@ class _DetailPageState extends State<DetailPage> {
           if (_saveState == _SaveState.downloading)
             Padding(
               padding: const EdgeInsets.only(right: 10),
-              child: Text(
-                '${(_progress * 100).round()}%',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
+              child: ValueListenableBuilder<double>(
+                valueListenable: _progress,
+                builder: (context, value, _) => Text(
+                  '${(value * 100).round()}%',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600),
+                ),
               ),
             ),
           if (chip != null) chip,

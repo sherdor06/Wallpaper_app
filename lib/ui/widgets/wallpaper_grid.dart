@@ -71,7 +71,7 @@ class WallpaperGrid extends StatelessWidget {
               // so the last row clears the floating nav + ad (extendBody adds
               // the bottom bar height to MediaQuery padding).
               padding: EdgeInsets.fromLTRB(
-                  8, topPadding, 8, 8 + MediaQuery.of(context).padding.bottom),
+                  8, topPadding, 8, 8 + MediaQuery.paddingOf(context).bottom),
               crossAxisCount: gridColumnsFor(constraints.maxWidth),
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
@@ -97,7 +97,7 @@ class WallpaperGrid extends StatelessWidget {
     // The shell uses extendBody, so the nav bar and the ad banner sit *over* the
     // bottom of this box; centring in the raw height would tuck the action
     // button under them.
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),

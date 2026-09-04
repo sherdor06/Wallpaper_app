@@ -63,7 +63,7 @@ class _FavoritesTabState extends State<FavoritesTab> {
                 .toList();
             // No header here — start just below the floating title row while
             // still scrolling behind it.
-            final topInset = MediaQuery.of(context).padding.top;
+            final topInset = MediaQuery.paddingOf(context).top;
             return WallpaperGrid(
               items: items,
               onRefresh: _refresh,

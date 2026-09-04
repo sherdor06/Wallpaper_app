@@ -87,7 +87,7 @@ class _HomeTabState extends State<HomeTab> {
         // Both platforms: the grid fills the whole tab (edge-to-edge) and
         // scrolls behind the floating chrome; the category chips float over
         // the images just below the title row (no frosted band).
-        final topInset = MediaQuery.of(context).padding.top;
+        final topInset = MediaQuery.paddingOf(context).top;
         return Stack(
           children: [
             Positioned.fill(
@@ -175,7 +175,7 @@ class _CategoryBarState extends State<_CategoryBar>
   }
 
   void _maybeStart() {
-    if (!mounted || MediaQuery.of(context).disableAnimations) return;
+    if (!mounted || MediaQuery.disableAnimationsOf(context)) return;
     if (_ticker.isActive) return;
     _lastTick = Duration.zero;
     _ticker.start();

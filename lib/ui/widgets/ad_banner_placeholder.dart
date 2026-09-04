@@ -82,7 +82,7 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     if (_setupStarted) return;
     _setupStarted = true;
 
-    final width = MediaQuery.of(context).size.width.truncate();
+    final width = MediaQuery.sizeOf(context).width.truncate();
     final size = BannerAdSize.inline(width: width, maxHeight: _maxHeight);
     try {
       final height = await size.getCalculatedHeight();

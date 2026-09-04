@@ -429,7 +429,7 @@ class _ArchivePageState extends State<ArchivePage> {
     return LayoutBuilder(
       builder: (context, constraints) => GridView.builder(
         padding: EdgeInsets.fromLTRB(
-            10, 10, 10, 10 + MediaQuery.of(context).padding.bottom),
+            10, 10, 10, 10 + MediaQuery.paddingOf(context).bottom),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           // Smaller target than the main grid — this is a lookup screen, so it
           // favours seeing more history at once over big previews. Same
