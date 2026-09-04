@@ -16,13 +16,17 @@ const _accent = Color(0xFF6C5CE7);
 
 /// Fraction of the native iOS tab bar's measured height that stays in the
 /// layout. UIKit reports a height that includes home-indicator room at the
-/// bottom; that room only reads correctly when the bar is the bottom-most view,
-/// and here the ad banner is, so it becomes dead space that holds the bar up off
-/// the banner. Dropping the tail of it lets the bar sit lower.
+/// bottom, and that room only reads correctly when the bar is the bottom-most
+/// view — which it now is, since the ad banner moved above it. So nothing is
+/// trimmed any more.
 ///
-/// This is the one number to turn if the bar still sits too high (lower it) or
-/// starts clipping its labels (raise it, up to 1.0 for no trim at all).
-const _iosNavKeep = 0.82;
+/// It was 0.82 while the banner sat underneath: the bar's reserve was dead
+/// space then, holding it up off the ad. Restore a value below 1.0 only if the
+/// banner ever goes back below the bar.
+///
+/// This is the one number to turn if the bar sits too low (lower it) or starts
+/// clipping its labels (raise it, 1.0 for no trim at all).
+const _iosNavKeep = 1.0;
 
 
 /// Root shell. The bottom navigation is platform-specific:
@@ -45,7 +49,7 @@ class _HomeShellState extends State<HomeShell> {
   /// True while the embedded Archive tab is in multi-select. The whole bottom
   /// chrome yields to it: the page hangs its selection bar off its own Scaffold,
   /// and with [Scaffold.extendBody] the body runs behind ours, so leaving either
-  /// the nav bar or the ad banner up would bury that bar. Photos does the same.
+  /// the ad banner or the nav bar up would bury that bar. Photos does the same.
   bool _archiveSelecting = false;
 
   /// iOS carries Archive in the tab bar (Home/Favorites/Archive/Settings);
@@ -125,19 +129,29 @@ class _HomeShellState extends State<HomeShell> {
                 ),
             ],
           ),
-          // Floating glass nav on top, ad pinned to the very bottom.
+          // Ad above the nav, not below it. The bar is what the user reaches
+          // for constantly, so it keeps the screen edge; putting the ad there
+          // instead parks a tap target the user does not want exactly where
+          // their thumb already lives.
+          //
+          // The bottom inset moves with the position: whichever child sits
+          // last has to clear the gesture bar, and that is now the nav.
           bottomNavigationBar: _archiveSelecting
               ? null
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildBottomNav(),
                     Container(
                       width: double.infinity,
                       color: Theme.of(context).scaffoldBackgroundColor,
-                      child: const SafeArea(
-                          top: false, child: AdBannerPlaceholder()),
+                      child: const AdBannerPlaceholder(),
                     ),
+                    // iOS's native bar reserves the home-indicator room itself
+                    // (see [_iosNavKeep]); wrapping it too would inset twice.
+                    if (Platform.isIOS)
+                      _buildBottomNav()
+                    else
+                      SafeArea(top: false, child: _buildBottomNav()),
                   ],
                 ),
         );

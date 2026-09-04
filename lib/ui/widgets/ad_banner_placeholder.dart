@@ -11,10 +11,15 @@ import '../../services/ad_service.dart';
 /// Scaffold's bottom column like any other child and the nav bar rests directly
 /// on top of it.
 ///
-/// A sticky banner sizes itself from the container width, and the SDK can be
-/// asked for that height before any ad exists — so the strip is reserved up
-/// front and nothing above it jumps when the ad arrives. While the banner loads
-/// (or if it fails) a neutral placeholder of the same height fills it.
+/// An inline banner stretches to the container width and stops at a height we
+/// choose, and the SDK can be asked for that height before any ad exists — so
+/// the strip is reserved up front and nothing around it jumps when the ad
+/// arrives. While the banner loads (or if it fails) a neutral placeholder of
+/// the same height fills it.
+///
+/// Inline rather than sticky: a sticky banner picks its own height for a
+/// screen-pinned slot and came back 100dp tall, which is a lot of the screen to
+/// hand to an ad that sits directly above the nav bar. [_maxHeight] caps it.
 ///
 /// The [AdWidget] is mounted the moment the ad object exists, not once it has
 /// loaded. That order is load-bearing: `BannerAd.load` only sends its request
@@ -29,9 +34,13 @@ class AdBannerPlaceholder extends StatefulWidget {
 }
 
 class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
-  /// Height used until the SDK reports the real one. Matches a standard banner,
-  /// so the reserved strip is close even before the answer arrives.
-  static const _fallbackHeight = 50.0;
+  /// Ceiling on the banner's height. The SDK fills up to this and reports what
+  /// it actually used; a standard banner is 50dp, which is what this asks for.
+  static const _maxHeight = 50;
+
+  /// Height used until the SDK reports the real one — same as the cap, so the
+  /// reserved strip is right even before the answer arrives.
+  static const _fallbackHeight = _maxHeight * 1.0;
 
   /// Unlike a mediation layer, this SDK does not keep retrying behind the view:
   /// a failed load stays failed until asked again. Without a retry a single
@@ -74,7 +83,7 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     _setupStarted = true;
 
     final width = MediaQuery.of(context).size.width.truncate();
-    final size = BannerAdSize.sticky(width: width);
+    final size = BannerAdSize.inline(width: width, maxHeight: _maxHeight);
     try {
       final height = await size.getCalculatedHeight();
       if (!mounted) return;
