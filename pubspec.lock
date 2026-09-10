@@ -269,26 +269,26 @@ packages:
     dependency: "direct main"
     description:
       name: firebase_analytics
-      sha256: a139dd0ada1c6e0ffd77bfdb877ac9061ffdec7c415e3e06113bdf8844db771f
+      sha256: "0bf812fe5fecf395c07b673f40d951929f631749bd7513a31b8bfafa182d9a06"
       url: "https://pub.dev"
     source: hosted
-    version: "12.4.6"
+    version: "12.5.0"
   firebase_analytics_platform_interface:
     dependency: transitive
     description:
       name: firebase_analytics_platform_interface
-      sha256: "448c319ea895da002e43892c7d3f15dccbc3c4c3b81d3e307e37da885ea52bdf"
+      sha256: "5c3ab4b681c837afd71f0abf77c7485f51c7b645d4ae77b96f9ed54779ff4126"
       url: "https://pub.dev"
     source: hosted
-    version: "6.0.6"
+    version: "6.0.7"
   firebase_analytics_web:
     dependency: transitive
     description:
       name: firebase_analytics_web
-      sha256: "67f287a0df75f27eafdd4a66a41e44f232c3aba713ea4794a1159893665a8bf5"
+      sha256: "09eb4d0ce4c9a16efbc277ac709a90eb197d5512592215a73c6a302ab1ab6c3a"
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.1+12"
+    version: "0.6.1+13"
   firebase_core:
     dependency: "direct main"
     description:
@@ -357,26 +357,26 @@ packages:
     dependency: "direct main"
     description:
       name: firebase_remote_config
-      sha256: c661fedafc8acf18eb541f4379b9decaef8bd414f2bede79cc2df4178020813b
+      sha256: b17051e0d8ebd26ec9745a7a6cb8f0762b6e3281d23126dc9ace728e499f3bfd
       url: "https://pub.dev"
     source: hosted
-    version: "6.5.6"
+    version: "6.6.0"
   firebase_remote_config_platform_interface:
     dependency: transitive
     description:
       name: firebase_remote_config_platform_interface
-      sha256: c05980baf7e116689d6f320db5b7e3b2ff19b30eb577f78150fae019057d591e
+      sha256: dc5a9713031f2ca744cb266d96a58609e929db19f3d91a1dd6bb8f8a0d77acad
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.6"
+    version: "3.0.7"
   firebase_remote_config_web:
     dependency: transitive
     description:
       name: firebase_remote_config_web
-      sha256: e09d6a4da4ac6223e74e56fdbe14c8f3a58d3a5c0e5061b6a32485a45c1385fd
+      sha256: "500abf695c370c76a486ad7480a6df7caf55d2d35ccc5c66b9fc9c1c47f2bc14"
       url: "https://pub.dev"
     source: hosted
-    version: "1.10.13"
+    version: "1.10.14"
   fixnum:
     dependency: transitive
     description:

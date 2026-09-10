@@ -117,7 +117,7 @@ PODS:
   - Firebase/RemoteConfig (12.18.0):
     - Firebase/CoreOnly
     - FirebaseRemoteConfig (~> 12.18.0)
-  - firebase_analytics (12.4.6):
+  - firebase_analytics (12.5.0):
     - firebase_core
     - FirebaseAnalytics (= 12.18.0)
     - Flutter
@@ -132,7 +132,7 @@ PODS:
     - Firebase/Messaging (= 12.18.0)
     - firebase_core
     - Flutter
-  - firebase_remote_config (6.5.6):
+  - firebase_remote_config (6.6.0):
     - Firebase/RemoteConfig (= 12.18.0)
     - firebase_core
     - Flutter
@@ -430,11 +430,11 @@ SPEC CHECKSUMS:
   CocoaLumberjack: e4ba3b414dfca8c1916c6303d37f63b3a95134c6
   cupertino_native_better: 48a6a9cd45efc9ea9e1eec30755b5a8ebe92f1f2
   Firebase: 5523dd53ebe603451b4e1befcd99fa20a5c015cd
-  firebase_analytics: 8df7de4d6de9c877306505d03d363929c50aeb14
+  firebase_analytics: eabab995ffa6e93bf1888e573eda3a8264c0f30f
   firebase_core: 22b31970001508f6e63945bedcb7b9de68819aa5
   firebase_crashlytics: 4b22e897b18e9529c074e710fec4a52739b4efbf
   firebase_messaging: e0eae0e66bd04d3c1856ad08ad84ac75e0673a55
-  firebase_remote_config: fb35b657e727a3056a165d73fecc02f41afbe22e
+  firebase_remote_config: 990169a8da90a9622619cf94dbab7118156b3bf8
   FirebaseABTesting: 7060ad22592c1ae86cccf9cc0f886f470084cbd5
   FirebaseAnalytics: 651ecdc96c7dd8df0c15d55b6c6b70f78c2987b9
   FirebaseCore: 96787d19ee32dc2242cc487b301bc616afeb398b
