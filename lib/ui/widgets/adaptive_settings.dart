@@ -191,15 +191,29 @@ class SettingsSwitchRow extends StatelessWidget {
         onChanged: onChanged,
       );
     }
+    // iOS switches are green when on — the system's colour, not the app's.
+    // CNSwitch falls back to the theme's primary (our purple) when no colour
+    // is given, so it has to be said explicitly; CupertinoSwitch already
+    // defaults to systemGreen, and is told too so the two never drift.
+    final green = CupertinoColors.systemGreen.resolveFrom(context);
     final Widget toggle = isIOS26OrAbove
         // The system control itself, so it picks up whatever the OS does
         // with switches this year — the Liquid Glass thumb included.
         ? SizedBox(
             width: 52,
             height: 32,
-            child: CNSwitch(value: value, onChanged: onChanged, height: 32),
+            child: CNSwitch(
+              value: value,
+              onChanged: onChanged,
+              height: 32,
+              color: green,
+            ),
           )
-        : CupertinoSwitch(value: value, onChanged: onChanged);
+        : CupertinoSwitch(
+            value: value,
+            onChanged: onChanged,
+            activeTrackColor: green,
+          );
     return CupertinoListTile.notched(
       title: Text(title),
       subtitle: subtitle == null ? null : Text(subtitle!),
