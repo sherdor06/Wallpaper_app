@@ -122,11 +122,13 @@ class _HomeShellState extends State<HomeShell> {
                               SegmentedPillItem(
                                 value: HomeLayout.editorial,
                                 icon: Icons.auto_awesome_outlined,
+                                sfSymbol: 'sparkles',
                                 label: 'For you',
                               ),
                               SegmentedPillItem(
                                 value: HomeLayout.collections,
                                 icon: Icons.grid_view_rounded,
+                                sfSymbol: 'square.grid.2x2.fill',
                                 label: 'Collections',
                               ),
                             ],

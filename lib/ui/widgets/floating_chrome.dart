@@ -1,6 +1,8 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
+import 'package:cupertino_native_better/cupertino_native_better.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -128,9 +130,15 @@ class ChromeIconButton extends StatelessWidget {
 }
 
 /// One entry in a [SegmentedPill].
-class SegmentedPillItem<T> {
+class SegmentedPillItem<T extends Object> {
   final T value;
   final IconData icon;
+
+  /// SF Symbol name for the native control on iOS 26+ (`sparkles`,
+  /// `square.grid.2x2.fill`). Optional: without it the native segment falls
+  /// back to [label] as text, which still works but no longer matches the
+  /// icon-only look of the other platforms.
+  final String? sfSymbol;
 
   /// Read by screen readers and shown as the tooltip — the pill itself is
   /// icon-only, so this is the only place the choice is named.
@@ -140,21 +148,32 @@ class SegmentedPillItem<T> {
     required this.value,
     required this.icon,
     required this.label,
+    this.sfSymbol,
   });
 }
 
 /// Icon-only switch between a few views, sized and dressed to sit in the
 /// floating top row beside [TitlePill] and [ChromeIconButton].
 ///
-/// Same platform split as its neighbours: iOS gets liquid glass, Android the
-/// solid pill with the nav bar's sliding accent disc — so the selected segment
-/// reads the same way the selected tab does, one screen-edge down. Generic over
-/// [T] so it can switch anything (an enum, a string, an index) anywhere in the
-/// app; nothing in it knows about the home screen.
+/// **Tapping anywhere on it advances to the next item.** The segments show
+/// where you are; they are not separate targets. For the two-item case this
+/// is the point — the whole pill is one big toggle, and there is no dead
+/// zone on the segment you are already on. With three or more it cycles,
+/// which is fine for a glanceable view switch and wrong for a form control;
+/// use a real segmented control for those.
 ///
-/// Two to four items is the useful range. Past that the row no longer fits
-/// beside a title, and a segmented control stops being a glance.
-class SegmentedPill<T> extends StatelessWidget {
+/// That single-tap rule is why every platform variant below is rendered as
+/// a picture and wrapped in one [GestureDetector]: the native and Cupertino
+/// controls would otherwise route taps segment by segment, and the selected
+/// segment would swallow them. They still animate — both move their thumb
+/// when the value changes — they just do not decide.
+///
+/// Platform split, matching the rest of the chrome and the tab bar:
+///   • iOS 26+ — [CNSegmentedControl], the system Liquid Glass control.
+///   • iOS < 26 — [CupertinoSlidingSegmentedControl], the plain system look.
+///   • Android — solid pill with the nav bar's sliding accent disc.
+/// Generic over [T] so it can switch anything, anywhere in the app.
+class SegmentedPill<T extends Object> extends StatelessWidget {
   final List<SegmentedPillItem<T>> items;
   final T value;
   final ValueChanged<T> onChanged;
@@ -171,42 +190,84 @@ class SegmentedPill<T> extends StatelessWidget {
     this.size = kTopBarHeight,
   }) : assert(items.length >= 2, 'A segmented pill needs at least two items');
 
-  @override
-  Widget build(BuildContext context) {
-    if (!Platform.isAndroid) return _glass(context);
-    return _solid(context);
+  int get _index {
+    final i = items.indexWhere((i) => i.value == value);
+    return i < 0 ? 0 : i;
   }
 
-  Widget _glass(BuildContext context) {
+  void _advance() => onChanged(items[(_index + 1) % items.length].value);
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget face;
+    if (isIOS26OrAbove) {
+      face = _native();
+    } else if (Platform.isIOS) {
+      face = _cupertino(context);
+    } else {
+      face = _solid(context);
+    }
+    return Semantics(
+      button: true,
+      label: '${items[_index].label}. Tap to switch.',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _advance,
+        // The face is a display, not a control — see the class note.
+        child: IgnorePointer(child: face),
+      ),
+    );
+  }
+
+  Widget _native() {
+    final symbols = [for (final i in items) i.sfSymbol];
+    return SizedBox(
+      height: size,
+      child: CNSegmentedControl(
+        labels: [for (final i in items) i.label],
+        sfSymbols: symbols.every((s) => s != null)
+            ? [for (final s in symbols) CNSymbol(s!)]
+            : null,
+        selectedIndex: _index,
+        // Never fires — pointer events stop at the IgnorePointer above — but
+        // the control requires one.
+        onValueChanged: (_) {},
+        height: size,
+        shrinkWrap: true,
+        color: _accent,
+      ),
+    );
+  }
+
+  Widget _cupertino(BuildContext context) {
     final glyph = size * 0.5;
-    // The `.icons` form: plain icons with press-dim on one shared glass
-    // surface — the iOS 26 toolbar-group look, and the lighter of the two
-    // constructors (no per-button stretch physics or glow layers).
-    return GlassButtonGroup.icons(
-      borderRadius: size / 2,
-      iconSize: glyph,
-      itemPadding: EdgeInsets.all((size - glyph) / 2),
-      items: [
-        for (final item in items)
-          GlassButtonGroupItem(
-            // Selection is carried by colour alone: the group has no selected
-            // state of its own, and the accent is what "chosen" means
-            // everywhere else in the chrome.
-            icon: Icon(
-              item.icon,
-              color: item.value == value ? _accent : null,
-              semanticLabel: item.label,
+    return SizedBox(
+      height: size,
+      child: CupertinoSlidingSegmentedControl<T>(
+        groupValue: value,
+        // Same reason as the native one: required, unreachable.
+        onValueChanged: (_) {},
+        thumbColor: _accent,
+        children: {
+          for (final item in items)
+            item.value: Padding(
+              padding: EdgeInsets.symmetric(horizontal: (size - glyph) / 2 - 4),
+              child: Icon(
+                item.icon,
+                size: glyph,
+                color: item.value == value
+                    ? Colors.white
+                    : CupertinoColors.label.resolveFrom(context),
+              ),
             ),
-            onTap: () => onChanged(item.value),
-          ),
-      ],
+        },
+      ),
     );
   }
 
   Widget _solid(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final glyph = size * 0.45;
-    final index = items.indexWhere((i) => i.value == value);
     // Inset disc, like the nav bar's: it should read as sitting *inside* the
     // pill, not filling it edge to edge.
     const inset = 4.0;
@@ -223,10 +284,7 @@ class SegmentedPill<T> extends StatelessWidget {
           AnimatedAlign(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            alignment: Alignment(
-              items.length == 1 ? 0 : -1 + 2 * index / (items.length - 1),
-              0,
-            ),
+            alignment: Alignment(-1 + 2 * _index / (items.length - 1), 0),
             child: Padding(
               padding: const EdgeInsets.all(inset),
               child: Container(
@@ -253,23 +311,12 @@ class SegmentedPill<T> extends StatelessWidget {
             children: [
               for (final item in items)
                 Expanded(
-                  child: Tooltip(
-                    message: item.label,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => onChanged(item.value),
-                      child: SizedBox(
-                        height: size,
-                        child: Icon(
-                        item.icon,
-                        size: glyph,
-                        color: item.value == value
-                            ? Colors.white
-                            : (dark ? Colors.white70 : Colors.black87),
-                          semanticLabel: item.label,
-                        ),
-                      ),
-                    ),
+                  child: Icon(
+                    item.icon,
+                    size: glyph,
+                    color: item.value == value
+                        ? Colors.white
+                        : (dark ? Colors.white70 : Colors.black87),
                   ),
                 ),
             ],
