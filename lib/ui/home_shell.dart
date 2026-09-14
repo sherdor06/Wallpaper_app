@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/material.dart';
 
+import '../services/home_layout_service.dart';
 import 'archive_page.dart';
 import 'favorites_tab.dart';
 import 'home_tab.dart';
@@ -43,7 +44,6 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
-  int _homeReset = 0; // bumped when Home is selected → resets its category to "All"
 
   /// True while the embedded Archive tab is in multi-select. The whole bottom
   /// chrome yields to it: the page hangs its selection bar off its own Scaffold,
@@ -67,13 +67,10 @@ class _HomeShellState extends State<HomeShell> {
 
   static const _gridTitles = ['Wallpapers', 'Favorites'];
 
-  void _select(int i) => setState(() {
-        _index = i;
-        if (i == 0) _homeReset++;
-      });
+  void _select(int i) => setState(() => _index = i);
 
   List<Widget> get _pages => [
-        HomeTab(resetSignal: _homeReset),
+        const HomeTab(),
         // Its empty state offers a way to the catalog, which on both platforms
         // means switching tab — Favorites is a page in the stack, not a route.
         FavoritesTab(onBrowse: () => _select(0)),
@@ -112,6 +109,31 @@ class _HomeShellState extends State<HomeShell> {
                     children: [
                       TitlePill(text: _gridTitles[_index]),
                       const Spacer(),
+                      // Home only: curated vs browse. Lives here rather than
+                      // in the tab so the whole top row is one widget's
+                      // business; it writes the service the tab listens to.
+                      if (_index == 0) ...[
+                        ListenableBuilder(
+                          listenable: HomeLayoutService.instance,
+                          builder: (context, _) => SegmentedPill<HomeLayout>(
+                            value: HomeLayoutService.instance.layout,
+                            onChanged: HomeLayoutService.instance.setLayout,
+                            items: const [
+                              SegmentedPillItem(
+                                value: HomeLayout.editorial,
+                                icon: Icons.auto_awesome_outlined,
+                                label: 'For you',
+                              ),
+                              SegmentedPillItem(
+                                value: HomeLayout.collections,
+                                icon: Icons.grid_view_rounded,
+                                label: 'Collections',
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!_archiveIsTab) const SizedBox(width: 8),
+                      ],
                       // Android only: on iOS this lives in the tab bar, and
                       // Settings is a tab on both platforms.
                       if (!_archiveIsTab)

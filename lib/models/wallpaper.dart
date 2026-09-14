@@ -63,6 +63,31 @@ class Wallpaper {
 
   bool get isLive => type == WallpaperType.live;
 
+  /// True when the catalog generator invented this title — "Cars 41",
+  /// "Space 12" — because the source file had no words in its name.
+  ///
+  /// Beyond reading weakly, an auto-title is a signal about provenance: those
+  /// files were tagged by position in a feed rather than by name, and are the
+  /// ones most often filed under the wrong category. Anything that has to
+  /// pick a single wallpaper to *represent* a set — a hero, a cover — should
+  /// prefer the titled ones.
+  bool get isAutoTitled {
+    final cat = category.replaceAll(RegExp(r'[_\-]+'), ' ');
+    return RegExp('^${RegExp.escape(cat)} \\d+\$', caseSensitive: false)
+        .hasMatch(title);
+  }
+
+  /// The wallpaper that best stands for [items]: the first with a real title,
+  /// or simply the first when none has one. Deterministic, so a cover does
+  /// not change between opens.
+  static Wallpaper? coverOf(List<Wallpaper> items) {
+    if (items.isEmpty) return null;
+    for (final w in items) {
+      if (!w.isAutoTitled) return w;
+    }
+    return items.first;
+  }
+
   /// Whether this is a 4K wallpaper (gated behind a rewarded ad to unlock).
   bool get is4k => resolution == '4K';
 

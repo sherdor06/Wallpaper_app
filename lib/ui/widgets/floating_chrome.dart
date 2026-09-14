@@ -127,6 +127,155 @@ class ChromeIconButton extends StatelessWidget {
   }
 }
 
+/// One entry in a [SegmentedPill].
+class SegmentedPillItem<T> {
+  final T value;
+  final IconData icon;
+
+  /// Read by screen readers and shown as the tooltip — the pill itself is
+  /// icon-only, so this is the only place the choice is named.
+  final String label;
+
+  const SegmentedPillItem({
+    required this.value,
+    required this.icon,
+    required this.label,
+  });
+}
+
+/// Icon-only switch between a few views, sized and dressed to sit in the
+/// floating top row beside [TitlePill] and [ChromeIconButton].
+///
+/// Same platform split as its neighbours: iOS gets liquid glass, Android the
+/// solid pill with the nav bar's sliding accent disc — so the selected segment
+/// reads the same way the selected tab does, one screen-edge down. Generic over
+/// [T] so it can switch anything (an enum, a string, an index) anywhere in the
+/// app; nothing in it knows about the home screen.
+///
+/// Two to four items is the useful range. Past that the row no longer fits
+/// beside a title, and a segmented control stops being a glance.
+class SegmentedPill<T> extends StatelessWidget {
+  final List<SegmentedPillItem<T>> items;
+  final T value;
+  final ValueChanged<T> onChanged;
+
+  /// Height and per-segment width. Defaults to the top-bar size so the pill
+  /// lines up with the title beside it.
+  final double size;
+
+  const SegmentedPill({
+    super.key,
+    required this.items,
+    required this.value,
+    required this.onChanged,
+    this.size = kTopBarHeight,
+  }) : assert(items.length >= 2, 'A segmented pill needs at least two items');
+
+  @override
+  Widget build(BuildContext context) {
+    if (!Platform.isAndroid) return _glass(context);
+    return _solid(context);
+  }
+
+  Widget _glass(BuildContext context) {
+    final glyph = size * 0.5;
+    // The `.icons` form: plain icons with press-dim on one shared glass
+    // surface — the iOS 26 toolbar-group look, and the lighter of the two
+    // constructors (no per-button stretch physics or glow layers).
+    return GlassButtonGroup.icons(
+      borderRadius: size / 2,
+      iconSize: glyph,
+      itemPadding: EdgeInsets.all((size - glyph) / 2),
+      items: [
+        for (final item in items)
+          GlassButtonGroupItem(
+            // Selection is carried by colour alone: the group has no selected
+            // state of its own, and the accent is what "chosen" means
+            // everywhere else in the chrome.
+            icon: Icon(
+              item.icon,
+              color: item.value == value ? _accent : null,
+              semanticLabel: item.label,
+            ),
+            onTap: () => onChanged(item.value),
+          ),
+      ],
+    );
+  }
+
+  Widget _solid(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final glyph = size * 0.45;
+    final index = items.indexWhere((i) => i.value == value);
+    // Inset disc, like the nav bar's: it should read as sitting *inside* the
+    // pill, not filling it edge to edge.
+    const inset = 4.0;
+    final disc = size - inset * 2;
+
+    return Container(
+      height: size,
+      width: size * items.length,
+      decoration: _solidDecoration(context, radius: size / 2),
+      child: Stack(
+        children: [
+          // The disc slides between segments rather than snapping — the same
+          // motion the nav bar uses, so the two feel like one system.
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment(
+              items.length == 1 ? 0 : -1 + 2 * index / (items.length - 1),
+              0,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(inset),
+              child: Container(
+                width: disc,
+                height: disc,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(colors: [_accent, _accentLight]),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _accent.withValues(alpha: 0.45),
+                      blurRadius: 12,
+                      spreadRadius: -2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              for (final item in items)
+                Tooltip(
+                  message: item.label,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onChanged(item.value),
+                    child: SizedBox(
+                      width: size,
+                      height: size,
+                      child: Icon(
+                        item.icon,
+                        size: glyph,
+                        color: item.value == value
+                            ? Colors.white
+                            : (dark ? Colors.white70 : Colors.black87),
+                        semanticLabel: item.label,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Floating pill button with a label and an optional leading glyph — the wide
 /// sibling of [ChromeIconButton].
 ///

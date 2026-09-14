@@ -24,6 +24,50 @@ int gridColumnsFor(
 }) =>
     (width / target).round().clamp(min, max);
 
+/// Opens the detail page for [w]. Shared by every grid and row so the
+/// transition is the same wherever a wallpaper is tapped.
+void openWallpaper(BuildContext context, Wallpaper w) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => DetailPage(wallpaper: w)),
+  );
+}
+
+/// The masonry grid as a sliver, for screens that put other content above it
+/// in one scroll — the editorial home stacks a hero and rows on top. Shares
+/// [WallpaperTile], the 8px rhythm and [gridColumnsFor] with [WallpaperGrid],
+/// so the two look identical; only the scroll container differs.
+///
+/// Column count needs the width, and a sliver has none of its own, so it is
+/// taken from [SliverLayoutBuilder]'s constraints — the same measurement
+/// [WallpaperGrid] makes with a [LayoutBuilder].
+class SliverWallpaperGrid extends StatelessWidget {
+  final List<Wallpaper> items;
+
+  const SliverWallpaperGrid({super.key, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverLayoutBuilder(
+      builder: (context, constraints) => SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        sliver: SliverMasonryGrid.count(
+          crossAxisCount: gridColumnsFor(constraints.crossAxisExtent),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childCount: items.length,
+          itemBuilder: (context, index) {
+            final w = items[index];
+            return WallpaperTile(
+              wallpaper: w,
+              onTap: () => openWallpaper(context, w),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 /// Reusable wallpaper grid shared by the Home and Favorites screens.
 ///
 /// Takes an already-filtered list and opens the detail page on tap.
@@ -52,12 +96,6 @@ class WallpaperGrid extends StatelessWidget {
     this.topPadding = 8,
   });
 
-  void _open(BuildContext context, Wallpaper w) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => DetailPage(wallpaper: w)),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final Widget child = items.isEmpty
@@ -80,7 +118,7 @@ class WallpaperGrid extends StatelessWidget {
                 final w = items[index];
                 return WallpaperTile(
                   wallpaper: w,
-                  onTap: () => _open(context, w),
+                  onTap: () => openWallpaper(context, w),
                 );
               },
             ),
