@@ -228,10 +228,127 @@ class SettingsSwitchRow extends StatelessWidget {
 /// Brief confirmation after an action ("cache cleared").
 void showSettingsToast(BuildContext context, String message) {
   if (Platform.isIOS) {
-    // A Flutter overlay, not a platform view, so it runs on every iOS
-    // version; the glass effect simply has less to do below 26.
-    CNToast.success(context: context, message: message);
+    _showIosHud(context, message);
     return;
   }
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// A centred, self-dismissing HUD — the shape iOS itself uses for "Added",
+/// "Copied" and the like.
+///
+/// Our own rather than the package's toast: on iOS 26 that one pinned itself
+/// to the top of the screen whatever position it was given, which put the
+/// Dynamic Island across the middle of the message, and with its glass turned
+/// off it stopped appearing at all. Fifty lines we control beat a third round
+/// of guessing at why.
+///
+/// Centred on purpose. Bottom placement would need the ad banner's and tab
+/// bar's heights, and the centre needs nothing — it is clear of the island
+/// above and the chrome below on every device.
+void _showIosHud(BuildContext context, String message) {
+  final overlay = Overlay.of(context, rootOverlay: true);
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (_) => _IosHud(message: message, onDone: () => entry.remove()),
+  );
+  overlay.insert(entry);
+}
+
+class _IosHud extends StatefulWidget {
+  final String message;
+  final VoidCallback onDone;
+  const _IosHud({required this.message, required this.onDone});
+
+  @override
+  State<_IosHud> createState() => _IosHudState();
+}
+
+class _IosHudState extends State<_IosHud> with SingleTickerProviderStateMixin {
+  static const _fadeIn = Duration(milliseconds: 180);
+  static const _hold = Duration(milliseconds: 1600);
+  static const _fadeOut = Duration(milliseconds: 260);
+
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: _fadeIn,
+    reverseDuration: _fadeOut,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _c.forward();
+    Future<void>.delayed(_fadeIn + _hold, () async {
+      if (!mounted) return;
+      await _c.reverse();
+      if (mounted) widget.onDone();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = CupertinoTheme.brightnessOf(context) == Brightness.dark;
+    return Positioned.fill(
+      child: IgnorePointer(
+        // Transparent Material so the Text below picks up a real default
+        // style instead of Flutter's "no Material ancestor" warning look.
+        child: Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: FadeTransition(
+              opacity: CurvedAnimation(parent: _c, curve: Curves.easeOut),
+              child: ScaleTransition(
+                scale: Tween(begin: 0.94, end: 1.0).animate(
+                  CurvedAnimation(parent: _c, curve: Curves.easeOutBack),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: dark
+                        ? const Color(0xF21C1C1E)
+                        : const Color(0xF5F2F2F7),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x40000000),
+                        blurRadius: 24,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        CupertinoIcons.checkmark_circle_fill,
+                        color: CupertinoColors.systemGreen,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        widget.message,
+                        style: TextStyle(
+                          color: dark ? Colors.white : Colors.black,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
