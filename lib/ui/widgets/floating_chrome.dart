@@ -1,8 +1,6 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
-import 'package:cupertino_native_better/cupertino_native_better.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -134,12 +132,6 @@ class SegmentedPillItem<T extends Object> {
   final T value;
   final IconData icon;
 
-  /// SF Symbol name for the native control on iOS 26+ (`sparkles`,
-  /// `square.grid.2x2.fill`). Optional: without it the native segment falls
-  /// back to [label] as text, which still works but no longer matches the
-  /// icon-only look of the other platforms.
-  final String? sfSymbol;
-
   /// Read by screen readers and shown as the tooltip — the pill itself is
   /// icon-only, so this is the only place the choice is named.
   final String label;
@@ -148,7 +140,6 @@ class SegmentedPillItem<T extends Object> {
     required this.value,
     required this.icon,
     required this.label,
-    this.sfSymbol,
   });
 }
 
@@ -162,17 +153,10 @@ class SegmentedPillItem<T extends Object> {
 /// which is fine for a glanceable view switch and wrong for a form control;
 /// use a real segmented control for those.
 ///
-/// That single-tap rule is why every platform variant below is rendered as
-/// a picture and wrapped in one [GestureDetector]: the native and Cupertino
-/// controls would otherwise route taps segment by segment, and the selected
-/// segment would swallow them. They still animate — both move their thumb
-/// when the value changes — they just do not decide.
-///
-/// Platform split, matching the rest of the chrome and the tab bar:
-///   • iOS 26+ — [CNSegmentedControl], the system Liquid Glass control.
-///   • iOS < 26 — [CupertinoSlidingSegmentedControl], the plain system look.
-///   • Android — solid pill with the nav bar's sliding accent disc.
-/// Generic over [T] so it can switch anything, anywhere in the app.
+/// Same platform split as its neighbours: iOS gets liquid glass, Android the
+/// solid pill with the nav bar's sliding accent disc — so the selected segment
+/// reads the same way the selected tab does, one screen-edge down. Generic
+/// over [T] so it can switch anything, anywhere in the app.
 class SegmentedPill<T extends Object> extends StatelessWidget {
   final List<SegmentedPillItem<T>> items;
   final T value;
@@ -199,68 +183,35 @@ class SegmentedPill<T extends Object> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget face;
-    if (isIOS26OrAbove) {
-      face = _native();
-    } else if (Platform.isIOS) {
-      face = _cupertino(context);
-    } else {
-      face = _solid(context);
-    }
+    if (!Platform.isAndroid) return _glass(context);
+    return _solid(context);
+  }
+
+  Widget _glass(BuildContext context) {
+    final glyph = size * 0.5;
+    // Every item advances, which keeps the package's own press-dim on
+    // whichever segment was touched while still making the whole pill one
+    // target. Selection is carried by colour: the group has no selected
+    // state of its own, and the accent is what "chosen" means everywhere
+    // else in the chrome.
     return Semantics(
       button: true,
       label: '${items[_index].label}. Tap to switch.',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _advance,
-        // The face is a display, not a control — see the class note.
-        child: IgnorePointer(child: face),
-      ),
-    );
-  }
-
-  Widget _native() {
-    final symbols = [for (final i in items) i.sfSymbol];
-    return SizedBox(
-      height: size,
-      child: CNSegmentedControl(
-        labels: [for (final i in items) i.label],
-        sfSymbols: symbols.every((s) => s != null)
-            ? [for (final s in symbols) CNSymbol(s!)]
-            : null,
-        selectedIndex: _index,
-        // Never fires — pointer events stop at the IgnorePointer above — but
-        // the control requires one.
-        onValueChanged: (_) {},
-        height: size,
-        shrinkWrap: true,
-        color: _accent,
-      ),
-    );
-  }
-
-  Widget _cupertino(BuildContext context) {
-    final glyph = size * 0.5;
-    return SizedBox(
-      height: size,
-      child: CupertinoSlidingSegmentedControl<T>(
-        groupValue: value,
-        // Same reason as the native one: required, unreachable.
-        onValueChanged: (_) {},
-        thumbColor: _accent,
-        children: {
+      child: GlassButtonGroup.icons(
+        borderRadius: size / 2,
+        iconSize: glyph,
+        itemPadding: EdgeInsets.all((size - glyph) / 2),
+        items: [
           for (final item in items)
-            item.value: Padding(
-              padding: EdgeInsets.symmetric(horizontal: (size - glyph) / 2 - 4),
-              child: Icon(
+            GlassButtonGroupItem(
+              icon: Icon(
                 item.icon,
-                size: glyph,
-                color: item.value == value
-                    ? Colors.white
-                    : CupertinoColors.label.resolveFrom(context),
+                color: item.value == value ? _accent : null,
+                semanticLabel: item.label,
               ),
+              onTap: _advance,
             ),
-        },
+        ],
       ),
     );
   }
@@ -273,55 +224,70 @@ class SegmentedPill<T extends Object> extends StatelessWidget {
     const inset = 4.0;
     final disc = size - inset * 2;
 
-    return Container(
-      height: size,
-      width: size * items.length,
-      decoration: _solidDecoration(context, radius: size / 2),
-      child: Stack(
-        children: [
-          // The disc slides between segments rather than snapping — the same
-          // motion the nav bar uses, so the two feel like one system.
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment(-1 + 2 * _index / (items.length - 1), 0),
-            child: Padding(
-              padding: const EdgeInsets.all(inset),
-              child: Container(
-                width: disc,
-                height: disc,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(colors: [_accent, _accentLight]),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _accent.withValues(alpha: 0.45),
-                      blurRadius: 12,
-                      spreadRadius: -2,
+    return Semantics(
+      button: true,
+      label: '${items[_index].label}. Tap to switch.',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _advance,
+        child: SizedBox(
+          height: size,
+          width: size * items.length,
+          // DecoratedBox, not Container: Container insets its child by the
+          // border width, which left a 42px box for a 44px disc and pushed
+          // the disc's rim over the pill's edge. DecoratedBox paints the
+          // border and leaves the layout alone.
+          child: DecoratedBox(
+            decoration: _solidDecoration(context, radius: size / 2),
+            child: Stack(
+              children: [
+                // The disc slides between segments rather than snapping —
+                // the same motion the nav bar uses, so the two feel like one
+                // system.
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment(-1 + 2 * _index / (items.length - 1), 0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(inset),
+                    child: Container(
+                      width: disc,
+                      height: disc,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                            colors: [_accent, _accentLight]),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _accent.withValues(alpha: 0.45),
+                            blurRadius: 12,
+                            spreadRadius: -2,
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Segments share the inner width rather than each claiming [size]:
-          // the decoration's 1px border is inset by Container, so the inner
-          // box is 2px narrower than the pill and fixed widths overflowed it.
-          Row(
-            children: [
-              for (final item in items)
-                Expanded(
-                  child: Icon(
-                    item.icon,
-                    size: glyph,
-                    color: item.value == value
-                        ? Colors.white
-                        : (dark ? Colors.white70 : Colors.black87),
                   ),
                 ),
-            ],
+                Row(
+                  children: [
+                    for (final item in items)
+                      SizedBox(
+                        width: size,
+                        height: size,
+                        child: Icon(
+                          item.icon,
+                          size: glyph,
+                          color: item.value == value
+                              ? Colors.white
+                              : (dark ? Colors.white70 : Colors.black87),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
