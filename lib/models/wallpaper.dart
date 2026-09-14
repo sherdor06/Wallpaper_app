@@ -73,9 +73,19 @@ class Wallpaper {
   /// prefer the titled ones.
   bool get isAutoTitled {
     final cat = category.replaceAll(RegExp(r'[_\-]+'), ' ');
-    return RegExp('^${RegExp.escape(cat)} \\d+\$', caseSensitive: false)
-        .hasMatch(title);
+    if (RegExp('^${RegExp.escape(cat)} \\d+\$', caseSensitive: false)
+        .hasMatch(title)) {
+      return true;
+    }
+    // A filename like `img_4471` survives the generator's word filter as the
+    // title "Img" — technically a word, but no more a title than a number.
+    return _junkTitles.contains(title.trim().toLowerCase());
   }
+
+  static const _junkTitles = {
+    'img', 'image', 'images', 'photo', 'pic', 'picture', 'wallpaper',
+    'wallpapers', 'background', 'file', 'untitled', 'screenshot',
+  };
 
   /// The wallpaper that best stands for [items]: the first with a real title,
   /// or simply the first when none has one. Deterministic, so a cover does

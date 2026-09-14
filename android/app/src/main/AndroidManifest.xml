@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Android 13+ gates notifications behind a runtime prompt. PushService
-         asks for it only after the user has applied a couple of wallpapers --
+         asks for it only after the user has applied a couple of wallpapers —
          a prompt on first launch is mostly denied, and Android gives one. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -50,7 +50,7 @@
                  if this app's signing fingerprint is listed there, open these
                  URLs directly instead of offering a chooser. Until that file
                  lists the *Play* signing key (not the upload key), verification
-                 fails and the user gets the chooser -- the link still works,
+                 fails and the user gets the chooser — the link still works,
                  it just asks first.
 
                  Keep the host and prefix in step with DeepLinkService. -->

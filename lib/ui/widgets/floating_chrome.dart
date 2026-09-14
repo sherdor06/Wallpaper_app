@@ -246,24 +246,28 @@ class SegmentedPill<T> extends StatelessWidget {
               ),
             ),
           ),
+          // Segments share the inner width rather than each claiming [size]:
+          // the decoration's 1px border is inset by Container, so the inner
+          // box is 2px narrower than the pill and fixed widths overflowed it.
           Row(
             children: [
               for (final item in items)
-                Tooltip(
-                  message: item.label,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onChanged(item.value),
-                    child: SizedBox(
-                      width: size,
-                      height: size,
-                      child: Icon(
+                Expanded(
+                  child: Tooltip(
+                    message: item.label,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onChanged(item.value),
+                      child: SizedBox(
+                        height: size,
+                        child: Icon(
                         item.icon,
                         size: glyph,
                         color: item.value == value
                             ? Colors.white
                             : (dark ? Colors.white70 : Colors.black87),
-                        semanticLabel: item.label,
+                          semanticLabel: item.label,
+                        ),
                       ),
                     ),
                   ),
