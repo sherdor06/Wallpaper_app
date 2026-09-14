@@ -45,6 +45,10 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - **Release build'da reklamani hech qachon bosmaslik.**
 - Banner navbar ustida, 50dp, inline. Qo'lda refresh qo'shilmaydi — SDK o'zi
   60s da yangilaydi.
+- **Debug build simulyator/emulyatorda banner yashirin** (`AdService.
+  bannerSuppressed`, native `isEmulator` orqali). `kDebugMode` bilan
+  qo'riqlangan — release'da bu kod umuman yo'q. Interstitial va rewarded
+  ta'sirlanmaydi. Bannerni simulyatorda ko'rish kerak bo'lsa — release APK.
 - Consent faqat EEA/UK da so'raladi; boshqa joyda `true`.
 - Chastota Remote Config'da: `ad_show_every`, `ad_browse_every`,
   `ad_min_gap_seconds`. Kamida bir haftalik ma'lumotsiz o'zgartirilmaydi.

@@ -32,6 +32,15 @@ import UIKit
           return
         }
         Self.saveToPhotos(filePath: path, result: result)
+      case "isEmulator":
+        // Debug-only convenience for the Dart side: the banner is hidden on
+        // the simulator so screens can be looked at without an ad strip.
+        // Compile-time, so a device build answers false without a lookup.
+        #if targetEnvironment(simulator)
+        result(true)
+        #else
+        result(false)
+        #endif
       case "setWallpaper":
         // iOS does not allow apps to set the wallpaper programmatically.
         result(FlutterError(code: "NOT_SUPPORTED",

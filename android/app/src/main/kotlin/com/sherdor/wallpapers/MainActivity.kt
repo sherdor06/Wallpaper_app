@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity() {
                     "setWallpaper" -> handleSetWallpaper(call, result)
                     "saveImageToGallery" -> handleSaveToGallery(call, result)
                     "setLiveWallpaper" -> handleSetLiveWallpaper(call, result)
+                    "isEmulator" -> result.success(isEmulator())
                     else -> result.notImplemented()
                 }
             }
@@ -199,5 +200,19 @@ class MainActivity : FlutterActivity() {
             }
         }
         return max(1, inSampleSize)
+    }
+
+    /// True on the Android emulator (goldfish / ranchu / generic images).
+    /// Debug-only convenience for the Dart side: the banner is hidden there
+    /// so screens can be looked at without an ad strip. Never consulted in
+    /// release — the Dart caller is behind kDebugMode.
+    private fun isEmulator(): Boolean {
+        val fp = Build.FINGERPRINT.lowercase()
+        val hw = Build.HARDWARE.lowercase()
+        val model = Build.MODEL.lowercase()
+        return fp.startsWith("generic") || fp.contains("emulator") ||
+            hw.contains("goldfish") || hw.contains("ranchu") ||
+            model.contains("emulator") || model.contains("android sdk built for") ||
+            Build.PRODUCT.lowercase().contains("sdk_gphone")
     }
 }

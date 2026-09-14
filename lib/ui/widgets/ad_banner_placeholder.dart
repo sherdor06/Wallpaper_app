@@ -69,9 +69,13 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     super.initState();
     // Skip entirely when ads are hidden (e.g. store screenshots).
     if (AdService.adsHidden) return;
-    // Wait until the SDK is up and consent is applied before requesting.
-    AdService.instance.adsAllowed.then((allowed) {
+    // Wait until the SDK is up and consent is applied before requesting —
+    // and, in a debug run on a simulator, collapse instead so the screen can
+    // be looked at without a demo-ad strip across it.
+    Future.wait([AdService.instance.adsAllowed, AdService.bannerSuppressed])
+        .then((r) {
       if (!mounted) return;
+      final allowed = r[0] && !r[1];
       setState(() => _adsPossible = allowed);
       if (allowed) unawaited(_setup());
     });

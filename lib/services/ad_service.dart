@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
-import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kReleaseMode;
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:yandex_mobileads/mobile_ads.dart';
 
 import 'analytics_service.dart';
@@ -41,6 +42,29 @@ class AdService {
   /// True when ads must not be shown at all — either the compile-time
   /// [adsHidden] flag, or the `ads_enabled` Remote Config kill switch is off.
   bool get _adsOff => adsHidden || !RemoteConfigService.instance.adsEnabled;
+
+  /// Whether the banner should stay out of the way on this run.
+  ///
+  /// Debug builds on a simulator or emulator only — a place for looking at
+  /// screens, where a demo-ad strip across the bottom is noise. Interstitial
+  /// and rewarded are untouched so those flows can still be exercised.
+  ///
+  /// `kDebugMode` is compile-time: in a release build this whole getter
+  /// folds to `false` before the device check can run, so a release APK on
+  /// an emulator still shows the banner and a release IPA never asks.
+  static Future<bool> get bannerSuppressed async {
+    if (!kDebugMode) return false;
+    // Both platforms answer natively. On Android it reads the build
+    // fingerprint; on iOS it is `targetEnvironment(simulator)`, decided at
+    // compile time. (The simulator's SIMULATOR_* environment variables do
+    // not reach the app process, so Platform.environment cannot tell.)
+    try {
+      const channel = MethodChannel('wallpaper.channel/setter');
+      return await channel.invokeMethod<bool>('isEmulator') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   bool _canRequestAds = false;
   final Completer<bool> _adsAllowed = Completer<bool>();
