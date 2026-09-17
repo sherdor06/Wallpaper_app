@@ -153,11 +153,14 @@ class SegmentedPillItem<T extends Object> {
 /// which is fine for a glanceable view switch and wrong for a form control;
 /// use a real segmented control for those.
 ///
-/// Same platform split as its neighbours: iOS gets liquid glass, Android the
-/// solid pill with the nav bar's sliding accent disc — so the selected segment
-/// reads the same way the selected tab does, one screen-edge down. Generic
-/// over [T] so it can switch anything, anywhere in the app.
-class SegmentedPill<T extends Object> extends StatelessWidget {
+/// The one chrome piece that is deliberately the same on both platforms — a
+/// solid pill, no glass — because the switch *is* the animation: the accent
+/// disc does not slide, it stretches. Its leading edge sets off first and
+/// the trailing edge follows, so for a moment it is a capsule spanning both
+/// seats before it gathers itself into the new one. The glyph it lands on
+/// pops in with a small turn; the one it left dims. Generic over [T] so it
+/// can switch anything, anywhere in the app.
+class SegmentedPill<T extends Object> extends StatefulWidget {
   final List<SegmentedPillItem<T>> items;
   final T value;
   final ValueChanged<T> onChanged;
@@ -174,49 +177,52 @@ class SegmentedPill<T extends Object> extends StatelessWidget {
     this.size = kTopBarHeight,
   }) : assert(items.length >= 2, 'A segmented pill needs at least two items');
 
+  @override
+  State<SegmentedPill<T>> createState() => _SegmentedPillState<T>();
+}
+
+class _SegmentedPillState<T extends Object> extends State<SegmentedPill<T>>
+    with SingleTickerProviderStateMixin {
+  static const _duration = Duration(milliseconds: 460);
+
+  late final AnimationController _anim = AnimationController(
+    vsync: this,
+    duration: _duration,
+    value: 1,
+  );
+
+  /// Seats the disc is moving between, as item indices.
+  late int _from = _index;
+  late int _to = _index;
+
   int get _index {
-    final i = items.indexWhere((i) => i.value == value);
+    final i = widget.items.indexWhere((i) => i.value == widget.value);
     return i < 0 ? 0 : i;
   }
 
-  void _advance() => onChanged(items[(_index + 1) % items.length].value);
+  @override
+  void didUpdateWidget(SegmentedPill<T> old) {
+    super.didUpdateWidget(old);
+    final now = _index;
+    if (now != _to) {
+      _from = _to;
+      _to = now;
+      _anim.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  void _advance() =>
+      widget.onChanged(widget.items[(_index + 1) % widget.items.length].value);
 
   @override
   Widget build(BuildContext context) {
-    if (!Platform.isAndroid) return _glass(context);
-    return _solid(context);
-  }
-
-  Widget _glass(BuildContext context) {
-    final glyph = size * 0.5;
-    // Every item advances, which keeps the package's own press-dim on
-    // whichever segment was touched while still making the whole pill one
-    // target. Selection is carried by colour: the group has no selected
-    // state of its own, and the accent is what "chosen" means everywhere
-    // else in the chrome.
-    return Semantics(
-      button: true,
-      label: '${items[_index].label}. Tap to switch.',
-      child: GlassButtonGroup.icons(
-        borderRadius: size / 2,
-        iconSize: glyph,
-        itemPadding: EdgeInsets.all((size - glyph) / 2),
-        items: [
-          for (final item in items)
-            GlassButtonGroupItem(
-              icon: Icon(
-                item.icon,
-                color: item.value == value ? _accent : null,
-                semanticLabel: item.label,
-              ),
-              onTap: _advance,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _solid(BuildContext context) {
+    final size = widget.size;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final glyph = size * 0.45;
     // Inset disc, like the nav bar's: it should read as sitting *inside* the
@@ -226,66 +232,138 @@ class SegmentedPill<T extends Object> extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: '${items[_index].label}. Tap to switch.',
+      label: '${widget.items[_index].label}. Tap to switch.',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _advance,
         child: SizedBox(
           height: size,
-          width: size * items.length,
+          width: size * widget.items.length,
           // DecoratedBox, not Container: Container insets its child by the
           // border width, which left a 42px box for a 44px disc and pushed
           // the disc's rim over the pill's edge. DecoratedBox paints the
           // border and leaves the layout alone.
           child: DecoratedBox(
             decoration: _solidDecoration(context, radius: size / 2),
-            child: Stack(
-              children: [
-                // The disc slides between segments rather than snapping —
-                // the same motion the nav bar uses, so the two feel like one
-                // system.
-                AnimatedAlign(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  alignment: Alignment(-1 + 2 * _index / (items.length - 1), 0),
-                  child: Padding(
-                    padding: const EdgeInsets.all(inset),
-                    child: Container(
-                      width: disc,
-                      height: disc,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                            colors: [_accent, _accentLight]),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _accent.withValues(alpha: 0.45),
-                            blurRadius: 12,
-                            spreadRadius: -2,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Row(
+            child: AnimatedBuilder(
+              animation: _anim,
+              builder: (context, _) {
+                final t = _anim.value;
+                // Leading edge leaves first, trailing edge catches up: the
+                // disc stretches into a capsule, then gathers itself. Both
+                // curves overshoot a touch so it lands with a little give.
+                final lead = Curves.easeOutBack.transform(
+                  ((t) / 0.72).clamp(0.0, 1.0),
+                );
+                final trail = Curves.easeInOutCubic.transform(
+                  ((t - 0.22) / 0.78).clamp(0.0, 1.0),
+                );
+                final a = inset + _from * size;
+                final b = inset + _to * size;
+                final forward = b >= a;
+                final left = forward ? a + (b - a) * trail : a + (b - a) * lead;
+                final right = forward
+                    ? a + (b - a) * lead + disc
+                    : a + (b - a) * trail + disc;
+                // How settled the arrival is, for the glyphs.
+                final settle = Curves.easeOutBack.transform(
+                  ((t - 0.35) / 0.65).clamp(0.0, 1.0),
+                );
+                return Stack(
                   children: [
-                    for (final item in items)
-                      SizedBox(
-                        width: size,
-                        height: size,
-                        child: Icon(
-                          item.icon,
-                          size: glyph,
-                          color: item.value == value
-                              ? Colors.white
-                              : (dark ? Colors.white70 : Colors.black87),
+                    Positioned(
+                      left: left,
+                      top: inset,
+                      width: (right - left).clamp(
+                        disc,
+                        size * widget.items.length,
+                      ),
+                      height: disc,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [_accent, _accentLight],
+                          ),
+                          borderRadius: BorderRadius.circular(disc / 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _accent.withValues(alpha: 0.45),
+                              blurRadius: 10,
+                            ),
+                          ],
                         ),
                       ),
+                    ),
+                    Row(
+                      children: [
+                        for (var i = 0; i < widget.items.length; i++)
+                          SizedBox(
+                            width: size,
+                            height: size,
+                            child: _Glyph(
+                              icon: widget.items[i].icon,
+                              size: glyph,
+                              // Arriving glyph: pops in with a small turn.
+                              // Leaving glyph: eases back into the idle
+                              // colour. Others sit still.
+                              t: i == _to
+                                  ? settle
+                                  : (i == _from ? 1 - settle : 0),
+                              arriving: i == _to,
+                              selectedColor: Colors.white,
+                              idleColor: dark ? Colors.white60 : Colors.black54,
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One glyph in a [SegmentedPill]: [t] is how selected it is right now, 0
+/// idle to 1 chosen — the arriving one runs it up, the leaving one down.
+class _Glyph extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final double t;
+
+  /// Only the glyph being landed on turns as it pops; the rest just fade.
+  final bool arriving;
+  final Color selectedColor;
+  final Color idleColor;
+
+  const _Glyph({
+    required this.icon,
+    required this.size,
+    required this.t,
+    required this.arriving,
+    required this.selectedColor,
+    required this.idleColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Overshoots to 1.18 on the way in and turns a sixth of a circle; the
+    // easeOutBack upstream is what gives the turn its little spring.
+    final tt = t.clamp(0.0, 1.0);
+    final pop = arriving ? 1 + 0.18 * math.sin(math.pi * tt) : 1.0;
+    final turn = arriving ? (1 - tt) * -math.pi / 6 : 0.0;
+    return Center(
+      child: Transform.rotate(
+        angle: turn,
+        child: Transform.scale(
+          scale: pop,
+          child: Icon(
+            icon,
+            size: size,
+            color: Color.lerp(idleColor, selectedColor, t.clamp(0.0, 1.0)),
           ),
         ),
       ),
@@ -562,7 +640,8 @@ BoxDecoration _solidDecoration(BuildContext context, {required double radius}) {
     color: dark ? const Color(0xF21C1C26) : Colors.white,
     borderRadius: BorderRadius.circular(radius),
     border: Border.all(
-        color: dark ? const Color(0x14FFFFFF) : const Color(0x14000000)),
+      color: dark ? const Color(0x14FFFFFF) : const Color(0x14000000),
+    ),
     boxShadow: [
       BoxShadow(
         color: dark ? const Color(0x59000000) : const Color(0x1F000000),
