@@ -10,6 +10,7 @@ saqlanadi. Live wallpaper: agar yonida `<nom>.mp4` bo'lsa, turi `live` bo'ladi.
 """
 from __future__ import annotations
 
+import colorsys
 import json
 import re
 from pathlib import Path
@@ -79,6 +80,52 @@ def resolution_label(path: Path) -> str:
     return "HD"
 
 
+def moods_for(thumb: Path) -> list[str]:
+    """Tone tags read off the image's colours — what the app's collection page
+    filters by ("Light", "Dark", "Vivid", "Mono"). Nothing semantic: the
+    Telegram sources carry no usable tags, and tone is what people actually
+    pick a wallpaper by. A picture may carry several (neon at night is dark
+    *and* vivid) or none. Keep the ids in step with `kMoodOrder` in
+    lib/models/wallpaper.dart.
+
+    Cheap on purpose: the thumbnail shrunk to 32px, HLS per pixel.
+    """
+    try:
+        with Image.open(thumb) as im:
+            im = im.convert("RGB")
+            im.thumbnail((32, 32))
+            px = list(im.getdata())
+    except Exception:
+        return []
+    if not px:
+        return []
+    ls: list[float] = []
+    ss: list[float] = []
+    for r, g, b in px:
+        _h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+        ls.append(l)
+        # Saturation is noise on near-black and near-white pixels; weight it
+        # by how mid-toned the pixel is so a black frame does not read "mono".
+        ss.append(s * (1 - abs(2 * l - 1)))
+    n = len(px)
+    light = sum(ls) / n
+    sat = sum(ss) / n
+    dark_share = sum(1 for v in ls if v < 0.2) / n
+    # Share of the frame that carries real colour. Mean saturation alone
+    # called a blue Earth on black "mono" — the planet is 15% of the frame.
+    colour_share = sum(1 for v in ss if v > 0.12) / n
+    out: list[str] = []
+    if colour_share < 0.06:
+        out.append("mono")
+    if light < 0.3 or dark_share > 0.6:
+        out.append("dark")
+    if light > 0.55 and sat < 0.22 and "mono" not in out:
+        out.append("light")
+    if sat >= 0.22 and light > 0.25:
+        out.append("vivid")
+    return out
+
+
 def main() -> None:
     if not OUT_DIR.exists():
         print(f"❌ '{OUT_DIR}' topilmadi. Avval process_images.py ni ishga tushiring.")
@@ -121,6 +168,7 @@ def main() -> None:
         credit = credit_for(category, name)
         if credit:
             tags.append(credit)
+        moods = moods_for(full.parent / f"{name}_thumb.webp")
 
         wallpapers.append(
             {
@@ -131,14 +179,20 @@ def main() -> None:
                 "resolution": resolution,
                 "premium": premium,
                 "tags": tags,
+                "moods": moods,
             }
         )
         used_categories.add(category)
 
-    categories = [
-        {"id": cid, "name": cat_config.get(cid, {}).get("name", title_case(cid))}
-        for cid in sorted(used_categories)
-    ]
+    categories = []
+    for cid in sorted(used_categories):
+        meta = cat_config.get(cid, {})
+        entry = {"id": cid, "name": meta.get("name", title_case(cid))}
+        # One line about the collection, shown under its name in the app's
+        # carousel. Optional: the app falls back to the wallpaper count.
+        if meta.get("tagline"):
+            entry["tagline"] = meta["tagline"]
+        categories.append(entry)
 
     catalog = {"version": 1, "categories": categories, "wallpapers": wallpapers}
     CATALOG_PATH.write_text(

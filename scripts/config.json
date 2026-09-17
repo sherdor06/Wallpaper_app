@@ -1,16 +1,126 @@
 {
-  "_comment": "Kategoriyalar va premium qoidasi. Yangi kategoriya qo'shsangiz shu yerga yozing.",
+  "_comment": "Kategoriyalar: nom, tagline (karuselda nom ostida bitta gap) va premium qoidasi. Yangi kategoriya qo'shsangiz shu yerga yozing.",
   "premium_if_4k": false,
   "categories": {
-    "popular":  { "name": "Popular",  "premium": false },
-    "gradient": { "name": "Gradient", "premium": false },
-    "amoled":   { "name": "AMOLED",   "premium": false },
-    "abstract": { "name": "Abstract", "premium": false },
-    "minimal":  { "name": "Minimal",  "premium": false },
-    "nature":   { "name": "Nature",   "premium": false },
-    "city":     { "name": "City",     "premium": false },
-    "space":    { "name": "Space",    "premium": false },
-    "anime":    { "name": "Anime",    "premium": false },
-    "live":     { "name": "Live",     "premium": false }
+    "popular": {
+      "name": "Popular",
+      "tagline": "What everyone is setting",
+      "premium": false
+    },
+    "girly": {
+      "name": "Girly",
+      "tagline": "Pink, bows and soft things",
+      "premium": false
+    },
+    "aesthetic": {
+      "name": "Aesthetic",
+      "tagline": "Calm, moody and pretty",
+      "premium": false
+    },
+    "nature": {
+      "name": "Nature",
+      "tagline": "Forests, lakes and open skies",
+      "premium": false
+    },
+    "animals": {
+      "name": "Animals",
+      "tagline": "Cats, dogs and the wild",
+      "premium": false
+    },
+    "cars": {
+      "name": "Cars",
+      "tagline": "Supercars and night drives",
+      "premium": false
+    },
+    "space": {
+      "name": "Space",
+      "tagline": "Stars, planets and the deep dark",
+      "premium": false
+    },
+    "anime": {
+      "name": "Anime",
+      "tagline": "Characters and quiet scenes",
+      "premium": false
+    },
+    "city": {
+      "name": "City",
+      "tagline": "Skylines and neon streets",
+      "premium": false
+    },
+    "flowers": {
+      "name": "Flowers",
+      "tagline": "Blooms, up close",
+      "premium": false
+    },
+    "abstract": {
+      "name": "Abstract",
+      "tagline": "Shape, colour and texture",
+      "premium": false
+    },
+    "comics": {
+      "name": "Comics",
+      "tagline": "Heroes and cartoons",
+      "premium": false
+    },
+    "games": {
+      "name": "Games",
+      "tagline": "Worlds from your favourite games",
+      "premium": false
+    },
+    "movies": {
+      "name": "Movies",
+      "tagline": "Scenes and posters",
+      "premium": false
+    },
+    "sport": {
+      "name": "Sport",
+      "tagline": "Teams, players and speed",
+      "premium": false
+    },
+    "tech": {
+      "name": "Tech",
+      "tagline": "Gadgets, circuits and glass",
+      "premium": false
+    },
+    "art": {
+      "name": "Art",
+      "tagline": "Paintings and illustrations",
+      "premium": false
+    },
+    "architecture": {
+      "name": "Architecture",
+      "tagline": "Buildings, bridges and lines",
+      "premium": false
+    },
+    "ocean": {
+      "name": "Ocean",
+      "tagline": "Waves, beaches and blue",
+      "premium": false
+    },
+    "mountains": {
+      "name": "Mountains",
+      "tagline": "Peaks, snow and valleys",
+      "premium": false
+    },
+    "minimal": {
+      "name": "Minimal",
+      "tagline": "Less, done well",
+      "premium": false
+    },
+    "gradient": {
+      "name": "Gradient",
+      "tagline": "Smooth colour, nothing else",
+      "premium": false
+    },
+    "amoled": {
+      "name": "AMOLED",
+      "tagline": "True black, for OLED screens",
+      "premium": false
+    },
+    "live": {
+      "name": "Live",
+      "tagline": "Wallpapers that move",
+      "premium": false
+    }
   }
 }

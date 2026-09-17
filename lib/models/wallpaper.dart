@@ -12,12 +12,21 @@ class WallpaperCategory {
   final String id;
   final String name;
 
-  const WallpaperCategory({required this.id, required this.name});
+  /// One line about the collection ("Pink, bows and soft things"), written
+  /// in the catalog config so it can change without an app update. Null on
+  /// older catalogs; callers then leave the line out — a count is never
+  /// shown in its place.
+  final String? tagline;
+
+  const WallpaperCategory({required this.id, required this.name, this.tagline});
 
   factory WallpaperCategory.fromJson(Map<String, dynamic> json) =>
       WallpaperCategory(
         id: (json['id'] ?? '').toString(),
         name: (json['name'] ?? json['id'] ?? '').toString(),
+        tagline: (json['tagline'] as String?)?.trim().isNotEmpty == true
+            ? (json['tagline'] as String).trim()
+            : null,
       );
 }
 
@@ -49,6 +58,12 @@ class Wallpaper {
   /// Search tags (optional).
   final List<String> tags;
 
+  /// Tone tags the catalog generator reads off the image's colours — values
+  /// from [kMoodOrder]. What a collection page filters by ("Light", "Dark")
+  /// when its items carry them; empty on catalogs generated before this
+  /// existed, in which case the page simply shows no chips.
+  final List<String> moods;
+
   const Wallpaper({
     required this.id,
     required this.title,
@@ -59,6 +74,7 @@ class Wallpaper {
     required this.category,
     this.videoUrl,
     this.tags = const [],
+    this.moods = const [],
   });
 
   bool get isLive => type == WallpaperType.live;
@@ -73,8 +89,10 @@ class Wallpaper {
   /// prefer the titled ones.
   bool get isAutoTitled {
     final cat = category.replaceAll(RegExp(r'[_\-]+'), ' ');
-    if (RegExp('^${RegExp.escape(cat)} \\d+\$', caseSensitive: false)
-        .hasMatch(title)) {
+    if (RegExp(
+      '^${RegExp.escape(cat)} \\d+\$',
+      caseSensitive: false,
+    ).hasMatch(title)) {
       return true;
     }
     // A filename like `img_4471` survives the generator's word filter as the
@@ -83,8 +101,18 @@ class Wallpaper {
   }
 
   static const _junkTitles = {
-    'img', 'image', 'images', 'photo', 'pic', 'picture', 'wallpaper',
-    'wallpapers', 'background', 'file', 'untitled', 'screenshot',
+    'img',
+    'image',
+    'images',
+    'photo',
+    'pic',
+    'picture',
+    'wallpaper',
+    'wallpapers',
+    'background',
+    'file',
+    'untitled',
+    'screenshot',
   };
 
   /// The wallpaper that best stands for [items]: the first with a real title,
@@ -112,7 +140,10 @@ class Wallpaper {
   ///  2. Via `key` only (e.g. "nature/001") — then they are built from [base]
   ///     (the CDN URL) as `{base}/{key}_thumb.webp`, `{base}/{key}_full.webp`,
   ///     `{base}/{key}.mp4`.
-  factory Wallpaper.fromJson(Map<String, dynamic> json, {required String base}) {
+  factory Wallpaper.fromJson(
+    Map<String, dynamic> json, {
+    required String base,
+  }) {
     final key = (json['key'] ?? json['id'] ?? '').toString();
     final type = WallpaperType.fromString(json['type']?.toString());
 
@@ -136,7 +167,30 @@ class Wallpaper {
       type: type,
       resolution: (json['resolution'] ?? 'HD').toString(),
       category: (json['category'] ?? '').toString(),
-      tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      tags:
+          (json['tags'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
+      moods:
+          (json['moods'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
     );
   }
 }
+
+/// Every mood the generator can assign, in the order chips are shown. Kept in
+/// step with `moods_for` in scripts/generate_catalog.py.
+const kMoodOrder = ['light', 'dark', 'vivid', 'mono'];
+
+/// "nature" → "Nature": the display name for a category id the catalog has
+/// no entry for.
+String categoryLabel(String id) =>
+    id.isEmpty ? id : id[0].toUpperCase() + id.substring(1);
+
+/// Display label for a mood id.
+String moodLabel(String mood) => switch (mood) {
+  'light' => 'Light',
+  'dark' => 'Dark',
+  'vivid' => 'Vivid',
+  'mono' => 'Mono',
+  _ => mood.isEmpty ? mood : mood[0].toUpperCase() + mood.substring(1),
+};
