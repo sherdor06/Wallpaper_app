@@ -76,7 +76,9 @@ Future<void> main() async {
   // is guarded until consent resolves. Awaiting it would put the whole ad stack
   // on the cold-start critical path — and in the EEA it would block startup for
   // as long as the consent dialog is on screen, which it waits for.
-  unawaited(AdService.instance.init());
+  // The navigator is for the simulator stand-in page (debug only); a device
+  // build never touches it.
+  unawaited(AdService.instance.init(navigator: WallpaperApp.navigatorKey));
   // Load favorites + unlocked (4K) wallpapers + theme choice from disk.
   await FavoritesService.instance.init();
   await HistoryService.instance.init();

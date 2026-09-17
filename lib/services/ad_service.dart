@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kReleaseMode;
 import 'package:flutter/services.dart' show MethodChannel;
+import 'package:flutter/widgets.dart' show GlobalKey, NavigatorState;
 import 'package:yandex_mobileads/mobile_ads.dart';
 
+import '../ui/widgets/ad_stand_in.dart';
 import 'analytics_service.dart';
 import 'consent_service.dart';
 import 'remote_config_service.dart';
@@ -43,16 +45,19 @@ class AdService {
   /// [adsHidden] flag, or the `ads_enabled` Remote Config kill switch is off.
   bool get _adsOff => adsHidden || !RemoteConfigService.instance.adsEnabled;
 
-  /// Whether the banner should stay out of the way on this run.
+  /// Whether this is a debug run on a simulator or emulator.
   ///
-  /// Debug builds on a simulator or emulator only — a place for looking at
-  /// screens, where a demo-ad strip across the bottom is noise. Interstitial
-  /// and rewarded are untouched so those flows can still be exercised.
+  /// There, no ad is requested at all — the SDK is never even started. The
+  /// banner collapses, and where an interstitial or rewarded ad would play,
+  /// an [AdStandIn] page appears instead: it says which ad would have shown,
+  /// why it fired and on which unit, and closes on a tap. The moments stay
+  /// visible and the frequency logic stays testable, without a single
+  /// impression — demo or real — leaving the device.
   ///
   /// `kDebugMode` is compile-time: in a release build this whole getter
   /// folds to `false` before the device check can run, so a release APK on
-  /// an emulator still shows the banner and a release IPA never asks.
-  static Future<bool> get bannerSuppressed async {
+  /// an emulator serves real ads and a release IPA never asks.
+  static Future<bool> get _onSimulator async {
     if (!kDebugMode) return false;
     // Both platforms answer natively. On Android it reads the build
     // fingerprint; on iOS it is `targetEnvironment(simulator)`, decided at
@@ -65,6 +70,13 @@ class AdService {
       return false;
     }
   }
+
+  /// True for the whole run once [init] found itself on a simulator in debug.
+  bool _simulated = false;
+
+  /// Where the stand-in page is pushed. Handed in by `main`, since ads fire
+  /// from inside the service with no BuildContext of their own.
+  GlobalKey<NavigatorState>? _navigator;
 
   bool _canRequestAds = false;
   final Completer<bool> _adsAllowed = Completer<bool>();
@@ -123,10 +135,9 @@ class AdService {
 
   // Yandex's public demo units. They always fill with test creatives, need no
   // moderation, and count against nobody's statistics — so debug builds use
-  // them unconditionally. That is what makes the full rewarded flow testable on
-  // an emulator while the real units are still waiting on moderation, and it
-  // keeps a developer's own taps out of the live account (the invalid-activity
-  // pattern every network bans for).
+  // them unconditionally. That keeps a developer's own taps on a real phone
+  // out of the live account (the invalid-activity pattern every network bans
+  // for). On a simulator not even these are requested — see [_onSimulator].
   static const _demoBanner = 'demo-banner-yandex';
   static const _demoInterstitial = 'demo-interstitial-yandex';
   static const _demoRewarded = 'demo-rewarded-yandex';
@@ -174,8 +185,19 @@ class AdService {
   /// it.
   static const _rewardTimeoutAfter = Duration(minutes: 3);
 
-  Future<void> init() async {
+  Future<void> init({GlobalKey<NavigatorState>? navigator}) async {
+    _navigator = navigator;
     if (_adsOff || _credentialsMissing) {
+      if (!_adsAllowed.isCompleted) _adsAllowed.complete(false);
+      return;
+    }
+
+    if (await _onSimulator) {
+      // Nothing below runs: no SDK, no consent hand-off, no request. The
+      // triggers still count and the cooldown still applies, so what the
+      // stand-in shows is exactly what a device would have shown.
+      _simulated = true;
+      _canRequestAds = true;
       if (!_adsAllowed.isCompleted) _adsAllowed.complete(false);
       return;
     }
@@ -294,7 +316,7 @@ class AdService {
     if (_adsOff || !_canRequestAds) return;
     _actionCount++;
     if (_actionCount % _showEvery != 0) return;
-    await _showInterstitial();
+    await _showInterstitial('Wallpaper applied — $_actionCount of every $_showEvery');
   }
 
   /// Show an interstitial while the user browses (the shuffle button) — the
@@ -307,13 +329,23 @@ class AdService {
     if (_adsOff || !_canRequestAds) return;
     _browseCount++;
     if (_browseCount % _browseEvery != 0) return;
-    await _showInterstitial();
+    await _showInterstitial('Browse step — $_browseCount of every $_browseEvery');
   }
 
   /// Shows the preloaded interstitial if the shared full-screen cooldown has
-  /// elapsed. No-op if too soon or none ready.
-  Future<void> _showInterstitial() async {
+  /// elapsed. No-op if too soon or none ready. [trigger] is what the
+  /// simulator stand-in reports as the reason.
+  Future<void> _showInterstitial(String trigger) async {
     if (DateTime.now().difference(_lastFullScreen) < _minGap) return;
+    if (_simulated) {
+      _noteFullScreenShown();
+      await _showStandIn(
+        kind: AdStandInKind.interstitial,
+        trigger: trigger,
+        unitId: Platform.isIOS ? _interstitialIos : _interstitialAndroid,
+      );
+      return;
+    }
     final ad = _interstitial;
     if (ad == null) {
       // Nothing loaded — start one for next time rather than waiting on it now.
@@ -349,6 +381,23 @@ class AdService {
     final inFlight = _rewardInFlight;
     if (inFlight != null) return inFlight;
 
+    if (_simulated) {
+      // Same shape as the real path — one show in flight, cooldown noted —
+      // so the detail page's "watching" state runs its real course.
+      _noteFullScreenShown();
+      final play = _showStandIn(
+        kind: AdStandInKind.rewarded,
+        trigger: 'Unlock — rewarded ad before the download',
+        unitId: Platform.isIOS ? _rewardedIos : _rewardedAndroid,
+      ).then((_) => true);
+      _rewardInFlight = play;
+      try {
+        return await play;
+      } finally {
+        _rewardInFlight = null;
+      }
+    }
+
     final ad = _rewarded;
     if (ad == null) {
       // Not filled — grant this time and load one for the next attempt.
@@ -364,6 +413,24 @@ class AdService {
     } finally {
       _rewardInFlight = null;
     }
+  }
+
+  /// Pushes the simulator stand-in and returns when it is closed. With no
+  /// navigator to push on — the service was started without one — the moment
+  /// simply passes, which is what a dismissed ad amounts to anyway.
+  Future<void> _showStandIn({
+    required AdStandInKind kind,
+    required String trigger,
+    required String unitId,
+  }) async {
+    final nav = _navigator?.currentState;
+    if (nav == null) return;
+    await nav.push(AdStandIn.route(
+      kind: kind,
+      trigger: trigger,
+      unitId: unitId,
+      cooldown: _minGap,
+    ));
   }
 
   /// Plays [ad] to completion and reports whether the unlock is granted.
