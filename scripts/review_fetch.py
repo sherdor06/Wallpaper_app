@@ -14,6 +14,12 @@ followed immediately by the caption-less full-size image DOC.
     python review_fetch.py --only cars nature    # only these categories
     python review_fetch.py --before 2026-01-01   # start OLDER than this date
     python review_fetch.py --face-filter         # pre-drop prominent-face photos
+    python review_fetch.py --channel @Prinssec_Walpaper --as aesthetic --per 60
+
+--channel/--as: single-topic channel mode. Every image in the channel (photo or
+image document, no hashtag needed) is staged into the one category given by
+--as. Dedup is scoped to that category, so message ids from different channels
+cannot collide in raw/. The queue, blocklist and review_serve.py are shared.
 
 --before <YYYY-MM-DD>: begin the (newest->oldest) scan just before this date, so
 already-fetched newer posts aren't re-scanned. E.g. `--before 2026-01-01` starts
@@ -44,11 +50,17 @@ TAG_RE = re.compile(r"#(\w+)", re.UNICODE)
 CHANNEL = "@iphonefotohd"
 
 # Russian hashtag -> clean latin category (whitelist). Tags absent here
-# (#девушки, #реклама, #разное ...) are never staged. Mirrors fetch_telegram.py.
+# (#реклама, #разное ...) are never staged. Shared by @iphonefotohd and
+# @phone_wallps, which post the same way (tagged PHOTO, then the DOC).
+#
+# #девушки is in since the Aesthetic collection exists: those go to the
+# reviewer under 'aesthetic', flagged 👤 when they are a person, and the
+# reviewer decides. It was excluded before there was anywhere to put them.
 TAG_MAP = {
     "cars": "cars", "машины": "cars",
-    "животные": "animals", "животное": "animals",
+    "животные": "animals", "животное": "animals", "котики": "animals",
     "природа": "nature",
+    "горы": "mountains",
     "море": "ocean",
     "абстракция": "abstract", "абстрация": "abstract", "текстуры": "abstract",
     "космос": "space",
@@ -56,11 +68,12 @@ TAG_MAP = {
     "спорт": "sport",
     "градиент": "gradient",
     "город": "city",
-    "архитектура": "architecture",
+    "архитектура": "architecture", "мосты": "architecture",
     "игры": "games",
     "комиксы": "comics", "мультфильмы": "comics", "мультики": "comics",
     "технологии": "tech", "apple": "tech", "android": "tech",
-    "кино": "movies",
+    "кино": "movies", "фильмы": "movies",
+    "девушки": "aesthetic", "сладости": "aesthetic",
 }
 
 
@@ -82,14 +95,25 @@ def save_queue(new_items: list[dict]) -> None:
     existing = on_disk.get("items") or [
         {**it, "status": "pending"} for it in on_disk.get("pending", [])
     ]
-    by_id = {it["mid"]: it for it in existing}
+    have = {_item_key(it) for it in existing}
     merged = list(existing)
     for it in new_items:
-        if it["mid"] not in by_id:
+        if _item_key(it) not in have:
             merged.append(it)
     QUEUE.parent.mkdir(parents=True, exist_ok=True)
     QUEUE.write_text(json.dumps({"items": merged}, ensure_ascii=False, indent=2),
                      encoding="utf-8")
+
+
+def _channel_key(channel: str) -> str:
+    """'@Foo' and 'foo' are the same channel."""
+    return channel.lstrip("@").lower()
+
+
+def _item_key(it: dict) -> tuple[str, int]:
+    """(channel, message id) — items staged before channels were recorded
+    belong to the default channel."""
+    return (it.get("ch") or _channel_key(CHANNEL), it["mid"])
 
 
 def category_for(caption: str) -> str | None:
@@ -100,16 +124,25 @@ def category_for(caption: str) -> str | None:
     return None
 
 
-def _already_have(mid: int, staged_ids: set[int]) -> bool:
-    """True if this document id is already staged this session or downloaded into
-    raw/ under ANY category (dedup by the file's Telegram id, not its category)."""
-    if mid in staged_ids:
+def _already_have(key: tuple[str, int], staged: set[tuple[str, int]],
+                  cat: str | None = None) -> bool:
+    """True if this (channel, message id) is already in the queue, or the id is
+    downloaded into raw/. Default (@iphonefotohd): any category, since one file
+    can be re-posted under several tags. Channel mode passes its category so
+    ids from a second channel are only matched against their own folder.
+
+    Message ids are per channel, so the queue is keyed by channel too: the
+    channels' id ranges will overlap eventually, and a candidate must not be
+    dropped because another channel once posted the same number."""
+    if key in staged:
         return True
-    return any(RAW.glob(f"*/tg_{mid}.*"))
+    return any(RAW.glob(f"{cat or '*'}/tg_{key[1]}.*"))
 
 
 async def run(per: int, scan: int, only: set[str], face_filter: bool,
-              before: datetime | None, offset_id: int = 0) -> None:
+              before: datetime | None, offset_id: int = 0,
+              channel: str = CHANNEL, as_cat: str | None = None,
+              suggest: bool = True) -> None:
     api_id = os.getenv("TELEGRAM_API_ID")
     api_hash = os.getenv("TELEGRAM_API_HASH")
     phone = os.getenv("TELEGRAM_PHONE")
@@ -121,7 +154,8 @@ async def run(per: int, scan: int, only: set[str], face_filter: bool,
     items: list[dict] = queue.get("items") or [
         {**it, "status": "pending"} for it in queue.get("pending", [])
     ]
-    staged_ids = {it["mid"] for it in items}  # dedup by file id across runs
+    ch = _channel_key(channel)
+    staged_ids = {_item_key(it) for it in items}  # dedup across runs
 
     hide_faces = None
     if face_filter:
@@ -143,11 +177,13 @@ async def run(per: int, scan: int, only: set[str], face_filter: bool,
         nonlocal dmin, dmax
         mid = doc_msg.id
         key = f"{cat}/tg_{mid}"
-        if key in blocklist or _already_have(mid, staged_ids):
+        if key in blocklist or _already_have((ch, mid), staged_ids, as_cat):
             return
         if staged.get(cat, 0) >= per:
             return
-        mime = doc_msg.document.mime_type
+        # Telegram "photos" (compressed, no document) download as JPEG.
+        doc = getattr(doc_msg, "document", None)
+        mime = doc.mime_type if doc else "image/jpeg"
         ext = mimetypes.guess_extension(mime) or ".jpg"
         rel = f"{cat}/tg_{mid}{ext}"
         dest = REVIEW / rel
@@ -168,8 +204,9 @@ async def run(per: int, scan: int, only: set[str], face_filter: bool,
             dest.unlink(missing_ok=True)
             print(f"  ⊘ {key} — yuz aniqlandi (--face-filter), o'tkazildi")
             return
-        items.append({"cat": cat, "mid": mid, "file": rel, "status": "pending"})
-        staged_ids.add(mid)
+        items.append({"cat": cat, "mid": mid, "file": rel, "status": "pending",
+                      "ch": ch})
+        staged_ids.add((ch, mid))
         staged[cat] = staged.get(cat, 0) + 1
         # Persist after every download so a dropped connection never loses the
         # queue (Telegram disconnects mid-scan happen; files stay + are recorded).
@@ -189,9 +226,19 @@ async def run(per: int, scan: int, only: set[str], face_filter: bool,
     # BELOW it. We scan newest->oldest, so the DOC is seen first and its category
     # photo comes on the very next (older) step — buffer the DOC, assign then.
     # offset_date starts the scan just before `before` (older posts only).
-    async for m in client.iter_messages(CHANNEL, limit=scan, offset_date=before,
+    async for m in client.iter_messages(channel, limit=scan, offset_date=before,
                                         offset_id=offset_id):
         scanned += 1
+        if as_cat:
+            # Single-topic channel: no tags, albums of plain photos. Stage every
+            # image straight into the given category; the reviewer decides.
+            doc = getattr(m, "document", None)
+            is_image_doc = bool(doc and (doc.mime_type or "").startswith("image/"))
+            if getattr(m, "photo", None) or is_image_doc:
+                await stage(m, as_cat)
+                if staged.get(as_cat, 0) >= per:
+                    break
+            continue
         cap = m.message or ""
         if TAG_RE.search(cap):
             if pending_doc is not None:
@@ -210,6 +257,24 @@ async def run(per: int, scan: int, only: set[str], face_filter: bool,
 
     REVIEW.mkdir(parents=True, exist_ok=True)
     save_queue(items)
+
+    if staged:
+        # Channel mode has no hashtags to lean on, so the image proposes its
+        # own category — unless --no-suggest says the channel *is* the
+        # category (a "girly" channel is girly whatever CLIP sees in a frame).
+        # Hashtag mode keeps the tag — it is the better signal. Both of those
+        # only take the 👤 flag, so reposted personal photos stand out.
+        # Optional: needs torch + open_clip; without them the reviewer just
+        # sees the staging category pre-selected.
+        try:
+            from suggest_category import annotate, write_suggestions
+            want = bool(as_cat) and suggest
+            print("\nKategoriya takliflari (CLIP)…" if want else "\n👤 belgilar (CLIP)…")
+            if annotate(items, suggest=want):
+                write_suggestions(items)
+        except ImportError:
+            print("\nℹ️  Taklif yo'q: `pip install torch open_clip_torch` qilib "
+                  "`python suggest_category.py` ni ishga tushiring.")
     new_total = sum(staged.values())
     rng = f"  Sanalar: {dmin:%Y-%m-%d} … {dmax:%Y-%m-%d}" if dmin and dmax else ""
     print(f"\nSkaner: {scanned} xabar. Yangi nomzod: {new_total}. "
@@ -229,6 +294,12 @@ def main() -> None:
                    help="Shu sanadan oldingi (eskiroq) postlardan boshlaydi")
     p.add_argument("--offset-id", type=int, default=0,
                    help="Shu xabar id'sidan pastroq (eskiroq) davom etadi")
+    p.add_argument("--channel", default=CHANNEL,
+                   help=f"Telegram kanal (default {CHANNEL})")
+    p.add_argument("--as", dest="as_cat", metavar="CATEGORY",
+                   help="Kanaldagi HAMMA rasmni shu kategoriyaga qo'yadi (hashtag'siz kanal uchun)")
+    p.add_argument("--no-suggest", action="store_true",
+                   help="--as bilan: kategoriya taklifi yo'q, faqat 👤 belgi — kanal bir mavzuli bo'lsa")
     args = p.parse_args()
     before = None
     if args.before:
@@ -237,7 +308,8 @@ def main() -> None:
         except ValueError:
             raise SystemExit("❌ --before format: YYYY-MM-DD (masalan 2026-01-01)")
     asyncio.run(run(args.per, args.scan, set(args.only or []), args.face_filter,
-                    before, args.offset_id))
+                    before, args.offset_id, args.channel, args.as_cat,
+                    suggest=not args.no_suggest))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,9 @@
 
 Two views (open http://127.0.0.1:8765):
   •  /          one-at-a-time: Keep (✓/→/Y) · Skip (✗/←/N) · Undo (↩/U)
+                The header holds a category picker (↑/↓ cycles it), pre-set to
+                the image's own suggestion when suggest_category.py has run.
+                Keep files the image under whatever the picker says.
   •  /gallery   overview grid of everything decided so far — Approved and
                 Rejected side by side; hover a thumbnail to flip its decision
                 (an approved one that slipped through → reject, and vice versa).
@@ -38,6 +41,7 @@ STATE = REVIEW / "queue.json"
 BLOCKLIST_FILE = SCRIPT_DIR / "blocklist.json"
 
 _BASE = {"pending": REVIEW, "kept": RAW, "skipped": TRASH}
+CONFIG = SCRIPT_DIR / "config.json"
 _LOCK = threading.Lock()
 _HISTORY: list[dict] = []  # in-session undo stack for the one-by-one view
 
@@ -72,6 +76,17 @@ def _blocklist(key: str, add: bool) -> None:
                               encoding="utf-8")
 
 
+def _categories(items: list[dict]) -> list[str]:
+    """Everything the picker may file an image under: config.json, existing
+    raw/ folders and whatever the queue already uses. Sorted, deduplicated."""
+    cats = set((_load(CONFIG, {}) or {}).get("categories", {}).keys())
+    if RAW.is_dir():
+        cats.update(d.name for d in RAW.iterdir() if d.is_dir() and not d.name.startswith("."))
+    cats.update(it.get("cat", "") for it in items)
+    cats.discard("")
+    return sorted(cats)
+
+
 def _safe(base: Path, rel: str) -> Path | None:
     try:
         p = (base / rel).resolve()
@@ -90,18 +105,28 @@ def _locate(rel: str) -> Path | None:
     return None
 
 
-def _apply(item: dict, to_status: str) -> None:
-    """Move the file to match `to_status` and update the blocklist."""
+def _apply(item: dict, to_status: str, cat: str | None = None) -> None:
+    """Move the file to match `to_status` (and `cat`, when the reviewer picked
+    a different category) and update the blocklist."""
     frm = item.get("status", "pending")
-    if frm == to_status:
+    recat = bool(cat) and cat != item["cat"]
+    if frm == to_status and not recat:
         return
     src = _safe(_BASE[frm], item["file"])
-    dst = _safe(_BASE[to_status], item["file"])
+    rel = item["file"]
+    if recat:
+        # The blocklist key must stay what review_fetch.py would compute on a
+        # re-scan — the category it staged under — so remember that one.
+        item.setdefault("src_cat", item["cat"])
+        item["cat"] = cat
+        rel = f"{cat}/{Path(item['file']).name}"
+    dst = _safe(_BASE[to_status], rel)
     if dst is not None:
         dst.parent.mkdir(parents=True, exist_ok=True)
         if src and src.exists():
             src.replace(dst)
-    key = f"{item['cat']}/tg_{item['mid']}"
+    item["file"] = rel
+    key = f"{item.get('src_cat', item['cat'])}/tg_{item['mid']}"
     if to_status == "skipped":
         _blocklist(key, add=True)
     elif frm == "skipped":
@@ -142,6 +167,10 @@ body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0
  height:100vh;display:flex;flex-direction:column;overflow:hidden}
 header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #24242e}
 .badge{background:#6C5CE7;color:#fff;padding:3px 12px;border-radius:20px;font-size:13px;font-weight:600}
+select.cat{appearance:none;-webkit-appearance:none;background:#6C5CE7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23fff'/%3E%3C/svg%3E") no-repeat right 10px center;
+ color:#fff;border:0;border-radius:20px;padding:5px 28px 5px 14px;font-size:14px;font-weight:700;cursor:pointer}
+select.cat.person{background-color:#b8503a}
+.sug{color:#9a9aa5;font-size:12px}.sug b{color:#cfcfe0}
 .count{color:#9a9aa5;font-size:14px;margin-left:auto}
 a.tab{color:#8E7BF5;text-decoration:none;font-size:14px;font-weight:600;border:1px solid #33334a;
  padding:5px 12px;border-radius:10px}
@@ -156,7 +185,8 @@ button:active{transform:scale(.96)}
 .hint{color:#666;font-size:12px;text-align:center;padding:0 0 12px}
 .done{text-align:center;color:#9a9aa5;font-size:18px;line-height:1.6}.done b{color:#00b894}
 </style></head><body>
-<header><span class="badge" id="cat">—</span><span id="key" style="color:#777;font-size:13px"></span>
+<header><select class="cat" id="cat" title="Kategoriya (↑/↓)"></select>
+ <span class="sug" id="sug"></span><span id="key" style="color:#777;font-size:13px"></span>
  <span class="count" id="count"></span><a class="tab" href="/gallery">▦ Gallery</a></header>
 <div class="bar"><div id="prog"></div></div>
 <main id="main"><div class="done">Yuklanmoqda…</div></main>
@@ -165,18 +195,28 @@ button:active{transform:scale(.96)}
  <button class="undo" onclick="undo()">↩ Undo</button>
  <button class="keep" onclick="decide('keep')">✓ Keep <small style="opacity:.6">(→)</small></button>
 </footer>
-<div class="hint">→ / Y = Keep · ← / N = Skip · U = Undo · ▦ Gallery = hammasini ko'rish</div>
+<div class="hint">→ / Y = Keep · ← / N = Skip · U = Undo · ↑ / ↓ = kategoriya · ▦ Gallery = hammasini ko'rish</div>
 <script>
-let cur=null,busy=false;
+let cur=null,busy=false,cats=[];
+const sel=document.getElementById('cat');
+function fillCats(list){if(list.join()===cats.join())return;cats=list;sel.innerHTML='';
+ for(const c of cats){const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}}
+function stepCat(d){if(!cats.length)return;let i=cats.indexOf(sel.value);i=(i+d+cats.length)%cats.length;sel.value=cats[i];}
 async function load(){
  const s=await (await fetch('/api/state')).json();
+ fillCats(s.categories||[]);
  document.getElementById('count').textContent=s.remaining+' qoldi · '+s.kept+' ✓ · '+s.skipped+' ✗';
  document.getElementById('prog').style.width=s.total?((s.kept+s.skipped)/s.total*100)+'%':'0';
  cur=s.current; const main=document.getElementById('main'),ctrl=document.getElementById('ctrl');
  if(!cur){ctrl.style.display='none';
   main.innerHTML='<div class="done">🎉 <b>Hammasi ko\\'rildi!</b><br>▦ Gallery da tekshiring, '
    +'so\\'ng <code>process_images → generate_catalog → Pages deploy</code>.</div>';return;}
- document.getElementById('cat').textContent=cur.cat;
+ // Pre-select the image's own suggestion; fall back to the staging category.
+ sel.value=(cur.suggest&&cats.includes(cur.suggest))?cur.suggest:cur.cat;
+ sel.classList.toggle('person',!!cur.person);
+ const sug=document.getElementById('sug');
+ sug.innerHTML=cur.suggest?('✨ <b>'+cur.suggest+'</b> '+Math.round((cur.suggest_p||0)*100)+'%'
+   +(cur.person?' · <b style="color:#ff9f7a">👤 odam</b>':'')):'';
  document.getElementById('key').textContent='tg_'+cur.mid;ctrl.style.display='flex';
  const im=new Image();im.onload=()=>{main.innerHTML='';main.appendChild(im);};
  im.src='/img?f='+encodeURIComponent(cur.file)+'&t='+Date.now();
@@ -184,12 +224,14 @@ async function load(){
 }
 async function decide(d){if(busy||!cur)return;busy=true;
  await fetch('/api/decide',{method:'POST',headers:{'Content-Type':'application/json'},
-  body:JSON.stringify({file:cur.file,decision:d})});busy=false;load();}
+  body:JSON.stringify({file:cur.file,decision:d,cat:sel.value})});busy=false;load();}
 async function undo(){if(busy)return;busy=true;await fetch('/api/undo',{method:'POST'});busy=false;load();}
 document.addEventListener('keydown',e=>{const k=e.key.toLowerCase();
  if(e.key==='ArrowRight'||k==='y')decide('keep');
  else if(e.key==='ArrowLeft'||k==='n')decide('skip');
+ else if(e.key==='ArrowUp'||e.key==='ArrowDown'){if(e.target===sel)return;e.preventDefault();stepCat(e.key==='ArrowUp'?-1:1);}
  else if(k==='u'||k==='z')undo();});
+sel.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight')e.preventDefault();});
 load();
 </script></body></html>"""
 
@@ -294,6 +336,7 @@ class Handler(BaseHTTPRequestHandler):
                 "remaining": len(pend),
                 "current": pend[0] if pend else None,
                 "next": pend[1]["file"] if len(pend) > 1 else None,
+                "categories": _categories(items),
             })
         elif u.path == "/api/gallery":
             with _LOCK:
@@ -323,7 +366,8 @@ class Handler(BaseHTTPRequestHandler):
                 it = next((x for x in items
                            if x["file"] == d.get("file") and x.get("status") == "pending"), None)
                 if it:
-                    _apply(it, to)
+                    cat = d.get("cat") if to == "kept" else None
+                    _apply(it, to, cat if isinstance(cat, str) and cat.strip() else None)
                     _HISTORY.append({"file": it["file"], "from": "pending", "to": to})
                     _save_items(items)
             self._json({"ok": bool(it)})

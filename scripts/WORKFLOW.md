@@ -44,6 +44,32 @@ npx wrangler pages deploy out --project-name=wallpapers-cdn --branch=main --comm
 Deploy takes a few minutes and sometimes fails with an empty "Failed to upload"
 error — just re-run the same command. Verify: `curl -A Mozilla https://wallpapers-cdn.pages.dev/catalog.json`.
 
+## A2. Add wallpapers from a single-topic channel (@Prinssec_Walpaper)
+No hashtags there — albums of plain photos. Everything is staged into one
+category and the reviewer files each image where it belongs:
+
+```bash
+python review_fetch.py --channel @Prinssec_Walpaper --as aesthetic --per 80
+#    stages review/aesthetic/tg_<id>.jpg, then runs suggest_category.py (CLIP)
+#    so every candidate carries a suggested category + a 👤 flag for people.
+python review_fetch.py --channel @Cute_Girly_Walpaper --as girly --no-suggest
+#    --no-suggest: the channel IS the category — the picker stays on it and
+#    only the 👤 flag is added. Use it for any single-topic channel.
+python review_fetch.py --channel @phone_wallps --per 20    # tagged, like @iphonefotohd
+#    To continue older: --offset-id <min id of the current review/queue.json>
+python review_serve.py                                    # http://127.0.0.1:8765
+#    header picker = suggested category (↑/↓ cycles it); Keep files the image
+#    under the picker's category, e.g. a cat → raw/animals/. Skip → blocklist.
+```
+Then step 3 of section A (process → catalog → cp site → deploy).
+
+`suggest_category.py` needs `pip install torch open_clip_torch` in the venv
+(~1 GB once). Without it the fetch still works; the picker just defaults to
+the staging category. Re-score pending items: `python suggest_category.py --all`.
+
+Telegram photos (not documents) arrive at ≤1280px → labelled "HD" in the
+catalog. Reposted personal photos (👤) are normally skipped.
+
 ## B. Delete wallpapers favorited in the simulator
 Mark bad wallpapers as favourites in the running app, then:
 ```bash
@@ -59,6 +85,11 @@ before favouriting so already-deleted keys don't reappear.
 ## Notes
 - Whitelist in `review_fetch.py`/`fetch_telegram.py` (`TAG_MAP`) excludes girl-heavy
   tags: #девушки #нейро #аниме #art.
+- `generate_catalog.py` writes `moods` per wallpaper (light/dark/vivid/mono,
+  from the thumb's colours) — the app's collection-page chips read them.
+- Retired placeholder content (generated PNGs + Openverse stock, 173 files)
+  lives in `review/.retired/<category>/`, not deleted. `fetch_stock.py` and
+  `gen_wallpapers.py` are no longer part of the pipeline.
 - The older ~839 raw/ images were fetched with a category-shift bug → some are
   mis-tagged (future re-tag cleanup).
 - Cloudflare Pages limits: 20,000 files/deploy (currently ~2000), 25 MB/file.
