@@ -7,6 +7,7 @@ import '../services/home_layout_service.dart';
 import 'archive_page.dart';
 import 'favorites_tab.dart';
 import 'home_tab.dart';
+import 'search/search_page.dart';
 import 'settings_page.dart';
 import 'widgets/ad_banner_placeholder.dart';
 import 'widgets/floating_chrome.dart';
@@ -28,13 +29,14 @@ const _accent = Color(0xFF6C5CE7);
 /// clipping its labels (raise it, 1.0 for no trim at all).
 const _iosNavKeep = 1.0;
 
-
 /// Root shell. The bottom navigation is platform-specific:
 ///   - iOS 26+  → native Liquid Glass [CNTabBar].
 ///   - iOS < 26 → floating frosted [GlassNavBar].
 ///   - Android  → solid [CircleNavBar] (no blur, no jank).
 ///
-/// The *contents* of that bar differ by platform too — see [_archiveIsTab].
+/// The bar holds Home, Favorites and Settings everywhere; Archive is a button
+/// in the top chrome. Search is a tab only where the bar can carry it as its
+/// own pill — see [_searchIsTab].
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -45,20 +47,18 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  /// True while the embedded Archive tab is in multi-select. The whole bottom
-  /// chrome yields to it: the page hangs its selection bar off its own Scaffold,
-  /// and with [Scaffold.extendBody] the body runs behind ours, so leaving either
-  /// the ad banner or the nav bar up would bury that bar. Photos does the same.
-  bool _archiveSelecting = false;
+  /// Search lives where the platform puts it. On iOS 26+ it is a tab, split
+  /// off the bar as its own glass pill on the right — Apple's arrangement.
+  /// Everywhere else — Android, iOS before 26 — a button in the top chrome
+  /// pushes [SearchPage].
+  ///
+  /// A plain split-off tab rather than the package's `searchItem`: on iOS 27
+  /// that native search role showed no field and never reported activation,
+  /// so the page carries its own field and the bar just selects it.
+  bool get _searchIsTab => isIOS26OrAbove;
 
-  /// iOS carries Archive in the tab bar (Home/Favorites/Archive/Settings);
-  /// Android keeps it on the top chrome and its bar holds three items. Every
-  /// list below is built from this flag so the pages, the nav items and the
-  /// chrome can never drift out of step.
-  bool get _archiveIsTab => Platform.isIOS;
-
-  /// Index of the Settings tab — last on both platforms.
-  int get _settingsIndex => _archiveIsTab ? 3 : 2;
+  /// Index of the Settings tab; Search, where it is a tab, comes after.
+  static const _settingsIndex = 2;
 
   /// Tabs 0 and 1 are full-bleed grids that scroll under the floating chrome.
   /// Archive and Settings bring their own [AppBar], so the chrome hides for
@@ -70,16 +70,13 @@ class _HomeShellState extends State<HomeShell> {
   void _select(int i) => setState(() => _index = i);
 
   List<Widget> get _pages => [
-        const HomeTab(),
-        // Its empty state offers a way to the catalog, which on both platforms
-        // means switching tab — Favorites is a page in the stack, not a route.
-        FavoritesTab(onBrowse: () => _select(0)),
-        if (_archiveIsTab)
-          ArchivePage(
-            onSelectingChanged: (v) => setState(() => _archiveSelecting = v),
-          ),
-        const SettingsPage(),
-      ];
+    const HomeTab(),
+    // Its empty state offers a way to the catalog, which on both platforms
+    // means switching tab — Favorites is a page in the stack, not a route.
+    FavoritesTab(onBrowse: () => _select(0)),
+    const SettingsPage(),
+    if (_searchIsTab) const SearchPage(asTab: true),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -132,19 +129,29 @@ class _HomeShellState extends State<HomeShell> {
                             ],
                           ),
                         ),
-                        if (!_archiveIsTab) const SizedBox(width: 8),
+                        const SizedBox(width: 8),
                       ],
-                      // Android only: on iOS this lives in the tab bar, and
-                      // Settings is a tab on both platforms.
-                      if (!_archiveIsTab)
+                      if (!_searchIsTab) ...[
                         ChromeIconButton(
-                          icon: Icons.inventory_2_outlined,
-                          tooltip: 'Archive',
+                          icon: Icons.search_rounded,
+                          tooltip: 'Search',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                                builder: (_) => const ArchivePage()),
+                              builder: (_) => const SearchPage(),
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
+                      ],
+                      ChromeIconButton(
+                        icon: Icons.inventory_2_outlined,
+                        tooltip: 'Archive',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ArchivePage(),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -159,24 +166,22 @@ class _HomeShellState extends State<HomeShell> {
       //
       // The bottom inset moves with the position: whichever child sits
       // last has to clear the gesture bar, and that is now the nav.
-      bottomNavigationBar: _archiveSelecting
-          ? null
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: double.infinity,
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  child: const AdBannerPlaceholder(),
-                ),
-                // iOS's native bar reserves the home-indicator room itself
-                // (see [_iosNavKeep]); wrapping it too would inset twice.
-                if (Platform.isIOS)
-                  _buildBottomNav()
-                else
-                  SafeArea(top: false, child: _buildBottomNav()),
-              ],
-            ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: double.infinity,
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: const AdBannerPlaceholder(),
+          ),
+          // iOS's native bar reserves the home-indicator room itself
+          // (see [_iosNavKeep]); wrapping it too would inset twice.
+          if (Platform.isIOS)
+            _buildBottomNav()
+          else
+            SafeArea(top: false, child: _buildBottomNav()),
+        ],
+      ),
     );
   }
 
@@ -184,14 +189,13 @@ class _HomeShellState extends State<HomeShell> {
     // A bar with a different item count than [_pages] silently maps taps to the
     // wrong screen, so tie the two together here rather than trusting the lists
     // to be edited in step.
-    assert(_pages.length == _settingsIndex + 1);
+    assert(_pages.length == _settingsIndex + 1 + (_searchIsTab ? 1 : 0));
 
-    // iOS 26+: native Liquid Glass tab bar. Not split — that layout existed to
-    // hang Search off to the right as a round pill, and Search is gone.
-    // Safe to hard-code four items: isIOS26OrAbove implies iOS, which is
-    // exactly when Archive is a tab.
+    // iOS 26+: native Liquid Glass tab bar — three tabs on the left and
+    // Search split off as its own pill on the right. Safe to hard-code:
+    // isIOS26OrAbove implies iOS, which is exactly when Search is a tab.
     if (isIOS26OrAbove) {
-      assert(_archiveIsTab && _pages.length == 4);
+      assert(_searchIsTab && _pages.length == 4);
       // No fixed height: the package skips its intrinsic-size measurement
       // whenever one is given (tab_bar.dart `_requestIntrinsicSize`), and the 85
       // this used to pass was sized for three items — two labelled plus the
@@ -210,11 +214,15 @@ class _HomeShellState extends State<HomeShell> {
             currentIndex: _index,
             onTap: _select,
             tint: _accent,
+            // The last item rides alone on the right: a round glass pill
+            // for Search, the shape Apple gives it.
+            split: true,
+            rightCount: 1,
             items: const [
               CNTabBarItem(label: 'Home', icon: CNSymbol('house.fill')),
               CNTabBarItem(label: 'Favorites', icon: CNSymbol('heart.fill')),
-              CNTabBarItem(label: 'Archive', icon: CNSymbol('archivebox.fill')),
               CNTabBarItem(label: 'Settings', icon: CNSymbol('gearshape.fill')),
+              CNTabBarItem(label: 'Search', icon: CNSymbol('magnifyingglass')),
             ],
           ),
         ),
@@ -232,12 +240,6 @@ class _HomeShellState extends State<HomeShell> {
         activeIcon: Icons.favorite,
         label: 'Favorites',
       ),
-      if (_archiveIsTab)
-        const GlassNavItem(
-          icon: Icons.inventory_2_outlined,
-          activeIcon: Icons.inventory_2,
-          label: 'Archive',
-        ),
       const GlassNavItem(
         icon: Icons.settings_outlined,
         activeIcon: Icons.settings,

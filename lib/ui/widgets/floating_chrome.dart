@@ -357,6 +357,98 @@ class ChromePillButton extends StatelessWidget {
   }
 }
 
+/// The search field in the floating row: a pill the same height as the
+/// buttons beside it, with the glyph on the left and a clear button once
+/// there is text. Glass on iOS, solid on Android, like every other pill.
+class ChromeSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final String hint;
+  final bool autofocus;
+
+  const ChromeSearchField({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+    this.onSubmitted,
+    this.hint = 'Search wallpapers',
+    this.autofocus = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final dim = onSurface.withValues(alpha: 0.5);
+    final content = Padding(
+      padding: const EdgeInsets.only(left: 14, right: 6),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, size: 20, color: dim),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              autofocus: autofocus,
+              onChanged: onChanged,
+              onSubmitted: onSubmitted,
+              textInputAction: TextInputAction.search,
+              style: TextStyle(
+                color: onSurface,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              cursorColor: _accentLight,
+              decoration: InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                hintText: hint,
+                hintStyle: TextStyle(
+                  color: dim,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          // Rebuilds with the text so the clear button appears and goes
+          // without the whole field having to.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) => value.text.isEmpty
+                ? const SizedBox(width: 8)
+                : IconButton(
+                    icon: Icon(Icons.close_rounded, size: 20, color: dim),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 36,
+                      height: 36,
+                    ),
+                    onPressed: () {
+                      controller.clear();
+                      onChanged('');
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    if (Platform.isAndroid) {
+      return Container(
+        height: kTopBarHeight,
+        decoration: _solidDecoration(context, radius: kTopBarHeight / 2),
+        child: content,
+      );
+    }
+    return GlassContainer(
+      height: kTopBarHeight,
+      shape: const LiquidRoundedSuperellipse(borderRadius: kTopBarHeight / 2),
+      child: content,
+    );
+  }
+}
+
 /// Continuously rotating gradient arc ("comet") around its [child] — decorates
 /// the title pill on both platforms. Respects reduced motion (freezes when
 /// animations are off).
