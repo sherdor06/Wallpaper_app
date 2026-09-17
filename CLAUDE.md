@@ -14,28 +14,89 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
   - **iOS < 26** → oddiy Cupertino (`CupertinoSwitch`, `CupertinoListTile`…).
   - **Android** → Material yoki solid pill (`_solidDecoration`).
 - Istisno: tepadagi floating qator (`TitlePill`, `ChromeIconButton`,
-  `SegmentedPill`) iOS'ning **hamma** versiyasida `liquid_glass_widgets`.
-  `CN*` faqat tab bar va Settings kontrollari uchun.
+  `ChromeSearchField`) iOS'ning **hamma** versiyasida `liquid_glass_widgets`.
+  `CN*` faqat tab bar va Settings kontrollari uchun. `SegmentedPill` bundan
+  mustasno — ikkala platformada bir xil solid pill (pastda).
 - Sahifa kodi platformani tekshirmaydi. Moslashuv primitivlarda:
   `lib/ui/widgets/adaptive_settings.dart`, `lib/ui/widgets/floating_chrome.dart`.
   Sahifada `Platform.isIOS` ko'rinsa — bu xato.
 - Tizim kontrollari tizim rangida qoladi (iOS switch — yashil). Ilova aksenti
   (`#6C5CE7 → #8E7BF5`) faqat ilova o'zi chizgan elementlarda.
 - Yangi qayta ishlatiladigan chrome widget → `floating_chrome.dart` ga.
-- `SegmentedPill` — istalgan joyi bosilsa keyingisiga o'tadi; segmentlar
-  alohida nishon emas. 2–3 element uchun; forma kontroli sifatida ishlatilmaydi.
+- `SegmentedPill` — 2–3 element uchun; forma kontroli sifatida ishlatilmaydi.
+  Ikkala platformada bir xil, glass yo'q: istalgan joyi bosilsa keyingisiga
+  o'tadi; aksent disk siljimaydi, *cho'ziladi* (oldingi chet avval ketadi,
+  orqa chet keyin yetib keladi — bir zum ikki o'rinni qoplagan kapsula),
+  kelgan glyph kichik burilish bilan "pop" qiladi, ketgani xiralashadi.
 
 ## Bosh ekran va kontent
 
 - Ikki layout: Editorial (hero + qatorlar + grid) va Collections (kategoriya
   kartalari). Tanlov `HomeLayoutService` da saqlanadi. Chip qatori yo'q.
 - Hero va muqova avto-nomli rasmlarni chetlab o'tadi (`Wallpaper.isAutoTitled`:
-  "Cars 41", "Img" kabi) — ular ko'pincha noto'g'ri kategoriyada.
-- 12 tadan kam rasmi bor kategoriya to'plam kartasi olmaydi.
+  "Cars 41", "Img" kabi) — ular ko'pincha noto'g'ri kategoriyada. Avto-nomli
+  hero sarlavhasi kategoriya nomi ("Sport"), pastida "Wallpaper of the day".
+- 12 tadan kam rasmi bor kategoriya to'plam kartasi ham, spotlight ham olmaydi.
+- Spotlight ("New collection" kartasi, hero ostida) Remote Config
+  `featured_category` dan. Bo'sh → karta yo'q. Yangi to'plam chiqqanda konsolda
+  id yoziladi, eskirgach tozalanadi — release kerak emas.
+- Hero ostida `CategoryCarousel`: 8 ta to'plam, o'rtadagisi fokusda (164×92,
+  qo'shnilar 0.86, halqasiz), har 4 s o'zi suriladi (teginilsa 6 s to'xtaydi),
+  cheksiz aylanadi. Sig'magan tagline fokusdagi kartada ticker bo'lib aylanadi
+  (keskin kesim, fade yo'q); bir aylanib boshiga kelmaguncha karusel kutadi.
+  Ro'yxat va tartib Remote Config `home_strip` (vergul bilan id'lar); 12 tadan
+  kam rasmli id tashlab ketiladi, 2 tadan kam qolsa karusel chiqmaydi.
+- Rasm soni hech qayerda ko'rsatilmaydi. Nom ostida tagline — `config.json`
+  `categories.<id>.tagline`, katalog bilan keladi; yo'q bo'lsa qator tushib
+  qoladi.
+- Har kategoriya `CollectionPage` ochadi (muqova + nom + tagline + kayfiyat
+  chiplari). `CategoryPage` yo'q. Chiplar katalogdagi `moods` dan
+  (`light/dark/vivid/mono`, `generate_catalog.py` rangdan hisoblaydi);
+  kamida 2 ta kayfiyat 6+ rasm bilan bo'lmasa chip qatori chiqmaydi.
+- To'plam aksenti `collection_accent.dart` da, ro'yxat qisqa qoladi: `girly`
+  (pushti) va `aesthetic` (lavanda). Aksent to'plam sahifasi, uning bo'lim
+  sarlavhasi va spotlight chipida — boshqa joyda ilova binafshasi.
+- Editorial qatorlar tartibi: Girly, Aesthetic, Popular, Nature, Space. Bo'sh
+  kategoriya qatori ko'rinmaydi — kontentdan oldin qo'shib qo'yish mumkin.
+- Qatorda: sarlavha, "See all ›" pill va oxirgi "See all" kartasi to'plamni
+  ochadi; rasm o'zining detail sahifasini ochadi.
+- Pastki bar hamma platformada Home / Favorites / Settings; **Archive —
+  tepadagi chrome tugmasi** (iOS'da ham). Archive tab emas.
+- Qidiruv platformaga qarab joylashadi: **iOS 26+** — `CNTabBar` `split: true,
+  rightCount: 1`: Search o'ngda alohida glass pill (4-tab, `SearchPage(asTab:
+  true)`: maydon tepada, orqaga tugma yo'q); **Android va iOS < 26** —
+  chrome'dagi lupa tugma → `SearchPage` (orqaga + `ChromeSearchField`).
+  Ikkala yo'l bitta `SearchBody` va `SearchService.search`. Paketning
+  `CNTabBar.searchItem` (native search roli) ishlatilmaydi: iOS 27 da maydon
+  chiqmadi va aktivlik xabari kelmadi.
+- Simulyatorda native tab bar'ga `tap` yetib bormaydi — `touch_path` bilan
+  ~100 ms bosish kerak.
+- Qidiruv — tez filtr, matn indeksi emas: so'zlar to'plam nomi/tagline'i,
+  kayfiyat, va tag'lardagi so'zlarga tegadi; har so'z rasmga mos kelishi
+  shart (AND). Natija tepasida faqat natijani shakllantirgan filtrlar teg
+  bo'lib ko'rinadi. Oxirgi 8 qidiruv `search_recent.json` da.
 - `addedAt` hozircha yo'q → "New" bo'limi qilinmaydi. Kelajakda kerak bo'lsa
   `generate_catalog.py` avvalgi katalogdan sanani saqlab qolishi shart.
-- Kategoriya nomi auditoriyani emas, estetikani bildiradi ("Aesthetic",
-  "Girls" emas).
+- Kategoriya nomi auditoriyani emas, estetikani bildiradi: "Girly" (qizlarcha
+  uslub) — "Girls" emas. `girly` = pushti/kawaii/bantik; `aesthetic` = umumiy
+  estetik fotolar (mushuk, qahva, sokin manzara).
+
+## Kontent manbalari
+
+- Faqat Telegram. Hashtag'li (odatiy rejim): `@iphonefotohd`, `@phone_wallps`.
+  Hashtag'siz (`--channel ... --as <cat>`): `@Prinssec_Walpaper` → aesthetic
+  (CLIP taklif bilan), `@Cute_Girly_Walpaper` → girly (`--no-suggest`: kanal
+  o'zi kategoriya, 90 ta rasm — tugagan). Openverse/stock (`fetch_stock.py`) va generatsiya
+  (`gen_wallpapers.py`) katalogga kirmaydi — ularning 173 ta rasmi
+  `scripts/review/.retired/` ga chiqarilgan (o'chirilmagan), kategoriya
+  papkalari (`minimal`, `mountains`, …) bo'sh bo'lsa ham `raw/` da qoladi.
+- Har rasm foydalanuvchi tomonidan tasdiqlanadi: `review_serve.py`. Kategoriya
+  taklifi CLIP dan (`suggest_category.py`, torch + open_clip venv'da), reviewer
+  o'zgartirishi mumkin — Keep tanlangan kategoriyaga yozadi.
+- 👤 belgi = odam surati (CLIP + yuz detektori). Boshqa odamning shaxsiy
+  fotosi wallpaper emas — mualliflik va shaxs huquqi; ular odatda Skip.
+- Telegram "photo" (hujjat emas) ≤1280px keladi → katalogda "HD" belgisi.
+  Bu manba 4K bermaydi; sifat cheklovi ma'lum va qabul qilingan.
 
 ## Reklama
 
@@ -45,20 +106,27 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - **Release build'da reklamani hech qachon bosmaslik.**
 - Banner navbar ustida, 50dp, inline. Qo'lda refresh qo'shilmaydi — SDK o'zi
   60s da yangilaydi.
-- **Debug build simulyator/emulyatorda banner yashirin** (`AdService.
-  bannerSuppressed`, native `isEmulator` orqali). `kDebugMode` bilan
-  qo'riqlangan — release'da bu kod umuman yo'q. Interstitial va rewarded
-  ta'sirlanmaydi. Bannerni simulyatorda ko'rish kerak bo'lsa — release APK.
+- **Debug build simulyator/emulyatorda reklama umuman so'ralmaydi** — SDK
+  ishga tushmaydi, demo unit ham yo'q. Banner yashirin; interstitial/rewarded
+  o'rnida `AdStandIn` sahifasi: qaysi reklama, nima uchun (trigger, hisob),
+  qaysi unit, cooldown. Bosilsa yopiladi, rewarded'da unlock beriladi.
+  Sanagichlar va cooldown haqiqiy — sahifa aynan reklama chiqadigan paytda
+  chiqadi. `kDebugMode` bilan qo'riqlangan — release'da bu kod umuman yo'q;
+  haqiqiy reklamani ko'rish kerak bo'lsa — release APK (va unga bosilmaydi).
 - Consent faqat EEA/UK da so'raladi; boshqa joyda `true`.
 - Chastota Remote Config'da: `ad_show_every`, `ad_browse_every`,
   `ad_min_gap_seconds`. Kamida bir haftalik ma'lumotsiz o'zgartirilmaydi.
 
 ## Git
 
-- Commit erkin, mantiqiy o'zgarish boyicha bittadan.
+- **Commit faqat foydalanuvchi "commit" deganda** — ish tugagach, saralab:
+  mantiqiy o'zgarish bo'yicha bittadan, mayda tuzatishlar o'z asosiy
+  o'zgarishiga qo'shiladi. Har qadamda commit qilinmaydi.
 - **Push faqat foydalanuvchi aytganda.** Hech qachon o'z-o'zidan emas.
 - Commit xabari: qisqa sarlavha + *nima uchun* (sabab, kontekst), ingliz tilida.
   "Fixed bug" emas — qanday bug, nega shunday tuzatildi.
+- Commit xabarida Telegram username'lar yozilmaydi ("the girly channel",
+  "a second tagged channel" — kanal nomi emas).
 
 ## Tekshirish
 
@@ -68,6 +136,11 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
   "tayyor" deyilmaydi.
 - iOS < 26 ko'rinishi simulyatorda yo'q — kod yo'li oddiy bo'lsa, analyze
   bilan cheklanadi va shu aytiladi.
+- Yangi katalog maydonini deploy'dan oldin ko'rish: `scripts/out` ni
+  `python3 -m http.server 8788 --bind 0.0.0.0` bilan tarqatib, Android'da
+  `--dart-define=CDN_BASE_URL=http://10.0.2.2:8788`, iOS'da
+  `http://localhost:8788`. Debug manifest cleartext'ga ruxsat beradi,
+  release — yo'q.
 - Testlar hozircha yozilmaydi.
 - `AndroidManifest.xml` izohlarida `--` ishlatilmaydi — XML buni taqiqlaydi va
   Android build butunlay yiqiladi (iOS sezmaydi).
