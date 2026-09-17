@@ -4,4 +4,12 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Debug only: lets a debug build read a catalog served from the Mac
+         (CDN_BASE_URL=http://10.0.2.2:8788, python -m http.server in
+         scripts/out) so new catalog fields can be checked on the emulator
+         before they are deployed. Merged into the debug manifest only; the
+         release build keeps the platform default and refuses plain http. -->
+    <application android:usesCleartextTraffic="true" tools:replace="android:usesCleartextTraffic"
+        xmlns:tools="http://schemas.android.com/tools" />
 </manifest>
