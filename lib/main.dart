@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemChrome, SystemUiMode, SystemUiOverlayStyle;
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'config/app_config.dart';
@@ -28,6 +29,13 @@ import 'ui/splash_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Edge-to-edge from the first frame, on every Android version — not only
+  // where Android 15 forces it. Before this, older Android kept opaque system
+  // bars until the first detail page was dismissed and switched the mode, so
+  // the same app looked different depending on where the user had been.
+  // Every screen already lays out for it: the chrome sits in SafeArea and the
+  // grids scroll under the bars. Bar colours come from [_systemBars].
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   // Firebase must init before any Firebase service (Crashlytics/Analytics/RC).
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Route uncaught Flutter framework + async errors to Crashlytics.
@@ -133,7 +141,15 @@ class _WallpaperAppState extends State<WallpaperApp> {
           // theme (not the device OS). iOS only — Android uses no glass widgets,
           // so the whole glass pipeline is skipped there (performance).
           builder: (context, child) {
-            final content = child ?? const SizedBox.shrink();
+            final brightness = Theme.of(context).brightness;
+            // Root system-bar style, so screens without an AppBar (home,
+            // search, collections) still get bars that match the theme. An
+            // AppBar deeper in the tree overrides the status bar for its own
+            // page, as it should.
+            final content = AnnotatedRegion<SystemUiOverlayStyle>(
+              value: _systemBars(brightness),
+              child: child ?? const SizedBox.shrink(),
+            );
             if (Platform.isAndroid) return content;
             return LiquidGlassWidgets.wrap(
               theme: GlassThemeData(brightness: Theme.of(context).brightness),
@@ -143,6 +159,27 @@ class _WallpaperAppState extends State<WallpaperApp> {
           home: const SplashGate(),
         );
       },
+    );
+  }
+
+  /// Transparent system bars with icons that contrast the resolved theme.
+  /// Android 15 makes the bars transparent itself; this is what brings older
+  /// Android to the same look. The engine applies the colours only below
+  /// API 35 (the window calls behind them are deprecated there), so nothing
+  /// here reaches a 15+ device.
+  static SystemUiOverlayStyle _systemBars(Brightness brightness) {
+    final icons = brightness == Brightness.dark
+        ? Brightness.light
+        : Brightness.dark;
+    return SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: icons,
+      // iOS reads the bar's *background* brightness and picks icons itself.
+      statusBarBrightness: brightness,
+      systemStatusBarContrastEnforced: false,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: icons,
+      systemNavigationBarContrastEnforced: false,
     );
   }
 

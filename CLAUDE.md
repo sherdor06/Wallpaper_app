@@ -142,6 +142,13 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
   `http://localhost:8788`. Debug manifest cleartext'ga ruxsat beradi,
   release — yo'q.
 - Testlar hozircha yozilmaydi.
+- Android'da edge-to-edge `main()` da yoqiladi (`SystemUiMode.edgeToEdge`),
+  faqat Android 15 majburlagan joyda emas — eski Android ham bir xil
+  ko'rinsin. Tizim barlari rangi bitta joyda: `main.dart` `_systemBars`
+  (ildiz `AnnotatedRegion`, tema bo'yicha shaffof barlar). Sahifalar
+  `SystemChrome` bilan rang o'rnatmaydi; `styles.xml` da `statusBarColor` /
+  `navigationBarColor` yozilmaydi — Play Console ularni eskirgan deb
+  belgilaydi, engine esa 35 dan pastda o'zi qo'llaydi.
 - `AndroidManifest.xml` izohlarida `--` ishlatilmaydi — XML buni taqiqlaydi va
   Android build butunlay yiqiladi (iOS sezmaydi).
 
