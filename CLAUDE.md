@@ -149,6 +149,9 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
   `SystemChrome` bilan rang o'rnatmaydi; `styles.xml` da `statusBarColor` /
   `navigationBarColor` yozilmaydi — Play Console ularni eskirgan deb
   belgilaydi, engine esa 35 dan pastda o'zi qo'llaydi.
+- Android build: AGP `9.0.1` + Gradle `9.1.0` (Flutter 3.44 shabloni bilan
+  bir xil), `android.r8.optimizedResourceShrinking=true`. `builtInKotlin` va
+  `newDsl` hozircha `false` — plaginlar KGP qo'llaydi.
 - `AndroidManifest.xml` izohlarida `--` ishlatilmaydi — XML buni taqiqlaydi va
   Android build butunlay yiqiladi (iOS sezmaydi).
 
