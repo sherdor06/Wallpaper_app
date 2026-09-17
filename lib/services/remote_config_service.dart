@@ -20,6 +20,8 @@ class RemoteConfigService {
   static const _kRewardedRequiredFor4k = 'rewarded_required_for_4k';
   static const _kRewardedRequiredForFhd = 'rewarded_required_for_fhd';
   static const _kConsentRequired = 'consent_required';
+  static const _kFeaturedCategory = 'featured_category';
+  static const _kHomeStrip = 'home_strip';
 
   // Safe defaults (identical to the old constants) — used until/unless the
   // console overrides them.
@@ -34,6 +36,14 @@ class RemoteConfigService {
   // ConsentService also asks on a device-locale hint, which covers the case
   // where this value never arrived.
   static const bool _defConsentRequired = false;
+  // Empty: no spotlight card on the home screen. Set to a category id
+  // ("aesthetic") from the console to announce a new collection; clear it
+  // again once it is old news — no app update either way.
+  static const String _defFeaturedCategory = '';
+  // The collections in the home carousel, in order. Comma-separated ids;
+  // unknown or thin ones are dropped by the home screen.
+  static const String _defHomeStrip =
+      'girly,aesthetic,nature,animals,cars,space,anime,city';
 
   FirebaseRemoteConfig? _rc;
 
@@ -57,6 +67,8 @@ class RemoteConfigService {
         _kRewardedRequiredFor4k: _defRewardedRequiredFor4k,
         _kRewardedRequiredForFhd: _defRewardedRequiredForFhd,
         _kConsentRequired: _defConsentRequired,
+        _kFeaturedCategory: _defFeaturedCategory,
+        _kHomeStrip: _defHomeStrip,
       });
       await rc.fetchAndActivate();
       _rc = rc;
@@ -107,4 +119,21 @@ class RemoteConfigService {
   /// actually knows where the device is. See [ConsentService].
   bool get consentRequired =>
       _rc?.getBool(_kConsentRequired) ?? _defConsentRequired;
+
+  /// Category id the home screen spotlights as a new collection, or empty for
+  /// none. The home screen also checks the category actually has enough
+  /// wallpapers, so a typo here hides the card rather than showing a broken one.
+  String get featuredCategory =>
+      (_rc?.getString(_kFeaturedCategory) ?? _defFeaturedCategory).trim();
+
+  /// Category ids for the home carousel, in display order. Falls back to
+  /// the default line-up when the remote value is empty.
+  List<String> get homeStrip {
+    final raw = _rc?.getString(_kHomeStrip) ?? '';
+    final ids = [
+      for (final s in (raw.isEmpty ? _defHomeStrip : raw).split(','))
+        if (s.trim().isNotEmpty) s.trim(),
+    ];
+    return ids;
+  }
 }

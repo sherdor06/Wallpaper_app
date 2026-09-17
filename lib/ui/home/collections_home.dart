@@ -5,7 +5,7 @@ import '../../data/wallpaper_repository.dart';
 import '../../models/wallpaper.dart';
 import '../../services/image_cache.dart';
 import '../widgets/wallpaper_grid.dart' show gridColumnsFor;
-import 'category_page.dart';
+import 'collection_page.dart';
 
 /// The browse home: one card per category, tap into the one you want.
 ///
@@ -35,21 +35,19 @@ class CollectionsHome extends StatelessWidget {
     for (final w in catalog.wallpapers) {
       (byId[w.category] ??= []).add(w);
     }
-    final names = {for (final c in catalog.categories) c.id: c.name};
+    final meta = {for (final c in catalog.categories) c.id: c};
     final out = [
       for (final e in byId.entries)
         if (e.value.length >= _minItems)
           _Collection(
             id: e.key,
-            name: names[e.key] ?? _capitalize(e.key),
+            name: meta[e.key]?.name ?? categoryLabel(e.key),
+            tagline: meta[e.key]?.tagline,
             items: e.value,
           ),
     ]..sort((a, b) => b.items.length.compareTo(a.items.length));
     return out;
   }
-
-  static String _capitalize(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
   @override
   Widget build(BuildContext context) {
@@ -74,8 +72,10 @@ class CollectionsHome extends StatelessWidget {
             collection: collections[i],
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => CategoryPage(
-                  title: collections[i].name,
+                builder: (_) => CollectionPage(
+                  id: collections[i].id,
+                  name: collections[i].name,
+                  tagline: collections[i].tagline,
                   items: collections[i].items,
                 ),
               ),
@@ -91,10 +91,16 @@ class _Collection {
   final String id;
   final String name;
   final List<Wallpaper> items;
-  const _Collection({required this.id, required this.name, required this.items});
+  final String? tagline;
+  const _Collection({
+    required this.id,
+    required this.name,
+    required this.items,
+    this.tagline,
+  });
 }
 
-/// Cover image, name, count. The cover is [Wallpaper.coverOf] the set — the
+/// Cover image, name, tagline. The cover is [Wallpaper.coverOf] the set — the
 /// first *titled* wallpaper, since the auto-titled ones are the likeliest to
 /// be filed in the wrong category and a Space card wearing a car is worse
 /// than no card.
@@ -118,8 +124,10 @@ class _CollectionCard extends StatelessWidget {
               cacheManager: AppCache.thumbs,
               fit: BoxFit.cover,
               memCacheWidth: 360,
-              placeholder: (_, __) => const ColoredBox(color: Color(0xFF1B1B22)),
-              errorWidget: (_, __, ___) => const ColoredBox(color: Color(0xFF1B1B22)),
+              placeholder: (_, __) =>
+                  const ColoredBox(color: Color(0xFF1B1B22)),
+              errorWidget: (_, __, ___) =>
+                  const ColoredBox(color: Color(0xFF1B1B22)),
             ),
             const DecoratedBox(
               decoration: BoxDecoration(
@@ -150,15 +158,19 @@ class _CollectionCard extends StatelessWidget {
                       height: 1.25,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${collection.items.length} wallpapers',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  if (collection.tagline != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      collection.tagline!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
