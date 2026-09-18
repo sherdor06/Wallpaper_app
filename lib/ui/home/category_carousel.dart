@@ -1,26 +1,17 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../models/wallpaper.dart';
-import '../../services/image_cache.dart';
+import '../../models/collection.dart';
+import '../widgets/wallpaper_thumb.dart';
 
-/// One entry in the carousel.
-class CarouselCollection {
-  final String id;
-  final String name;
-  final List<Wallpaper> items;
+/// Card size when focused; neighbours are drawn at [_sideScale] of it.
+const _cardWidth = 164.0;
+const _cardHeight = 92.0;
+const _sideScale = 0.86;
 
-  /// The line under the name; left out when the catalog has none.
-  final String? tagline;
-  const CarouselCollection({
-    required this.id,
-    required this.name,
-    required this.items,
-    this.tagline,
-  });
-}
+/// How far the focused card reaches into each neighbour's page.
+const _overlap = 14.0;
 
 /// Lets the focused card's ticker hold the carousel: the strip does not
 /// move on until a long tagline has rolled round once and come back to its
@@ -53,8 +44,8 @@ class _TickerGate extends ChangeNotifier {
 /// collection count, so the auto-advance never has to rewind across seven
 /// cards to get back to the first.
 class CategoryCarousel extends StatefulWidget {
-  final List<CarouselCollection> collections;
-  final void Function(CarouselCollection) onOpen;
+  final List<Collection> collections;
+  final void Function(Collection) onOpen;
 
   const CategoryCarousel({
     super.key,
@@ -67,14 +58,6 @@ class CategoryCarousel extends StatefulWidget {
 }
 
 class _CategoryCarouselState extends State<CategoryCarousel> {
-  /// Card size when focused; neighbours are [_sideScale] of it.
-  static const _cardWidth = 164.0;
-  static const _cardHeight = 92.0;
-  static const _sideScale = 0.86;
-
-  /// How far the focused card reaches into each neighbour's page.
-  static const _overlap = 14.0;
-
   /// How long a card holds the centre before the strip moves on, and how
   /// long a touch keeps it still afterwards. Long enough to read a card,
   /// short enough that the strip is visibly alive.
@@ -205,7 +188,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
 /// One card. Its size and dimming follow how far it is from the centre,
 /// read straight off the controller so they move with the finger.
 class _Card extends StatelessWidget {
-  final CarouselCollection collection;
+  final Collection collection;
   final int index;
   final PageController controller;
   final _TickerGate gate;
@@ -221,7 +204,7 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cover = Wallpaper.coverOf(collection.items);
+    final tagline = collection.tagline;
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
@@ -231,7 +214,7 @@ class _Card extends StatelessWidget {
             ? (controller.page ?? controller.initialPage.toDouble())
             : controller.initialPage.toDouble();
         final d = (page - index).abs().clamp(0.0, 1.0);
-        final scale = 1 - d * (1 - _CategoryCarouselState._sideScale);
+        final scale = 1 - d * (1 - _sideScale);
         // The card is always laid out at full size and *drawn* smaller for
         // a neighbour. Laying neighbours out smaller re-wrapped the text at
         // the narrower width, so a line changed as a card moved between
@@ -242,8 +225,8 @@ class _Card extends StatelessWidget {
           child: Transform.scale(
             scale: scale,
             child: SizedBox(
-              width: _CategoryCarouselState._cardWidth,
-              height: _CategoryCarouselState._cardHeight,
+              width: _cardWidth,
+              height: _cardHeight,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -272,19 +255,7 @@ class _Card extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (cover != null)
-                CachedNetworkImage(
-                  imageUrl: cover.thumbUrl,
-                  cacheManager: AppCache.thumbs,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 400,
-                  placeholder: (_, __) =>
-                      const ColoredBox(color: Color(0xFF1B1B22)),
-                  errorWidget: (_, __, ___) =>
-                      const ColoredBox(color: Color(0xFF1B1B22)),
-                )
-              else
-                const ColoredBox(color: Color(0xFF1B1B22)),
+              WallpaperThumb(wallpaper: collection.cover, memCacheWidth: 400),
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -314,9 +285,9 @@ class _Card extends StatelessWidget {
                         height: 1.2,
                       ),
                     ),
-                    if (collection.tagline != null)
+                    if (tagline != null)
                       _Marquee(
-                        text: collection.tagline!,
+                        text: tagline,
                         controller: controller,
                         index: index,
                         gate: gate,

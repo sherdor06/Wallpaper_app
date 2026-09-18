@@ -1,11 +1,19 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../models/collection.dart';
 import '../../models/wallpaper.dart';
-import '../../services/image_cache.dart';
 import '../widgets/floating_chrome.dart';
+import '../widgets/wallpaper_thumb.dart';
 import '../widgets/wallpaper_grid.dart';
 import 'collection_accent.dart';
+
+/// Pushes [collection]'s page. Shared by every card, row header and chip
+/// that leads to a collection, so the transition is the same everywhere.
+void openCollection(BuildContext context, Collection collection) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => CollectionPage(collection: collection)),
+  );
+}
 
 /// One collection's wallpapers, pushed from a card, a section's "See all" or
 /// the spotlight.
@@ -19,21 +27,9 @@ import 'collection_accent.dart';
 /// the name and the selected chip, nothing else: the page belongs to the
 /// collection, the app still belongs to the app.
 class CollectionPage extends StatefulWidget {
-  final String id;
-  final String name;
-  final List<Wallpaper> items;
+  final Collection collection;
 
-  /// One line about the collection, under the name. Null when the catalog
-  /// has none; the line is then simply left out — never a count.
-  final String? tagline;
-
-  const CollectionPage({
-    super.key,
-    required this.id,
-    required this.name,
-    required this.items,
-    this.tagline,
-  });
+  const CollectionPage({super.key, required this.collection});
 
   @override
   State<CollectionPage> createState() => _CollectionPageState();
@@ -51,7 +47,7 @@ class _CollectionPageState extends State<CollectionPage> {
   /// least two moods qualify; one chip alone is just "All" said twice.
   late final List<String> _moods = () {
     final counts = <String, int>{};
-    for (final w in widget.items) {
+    for (final w in widget.collection.items) {
       for (final m in w.moods) {
         counts[m] = (counts[m] ?? 0) + 1;
       }
@@ -65,22 +61,18 @@ class _CollectionPageState extends State<CollectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CollectionAccent.of(widget.id);
+    final collection = widget.collection;
+    final accent = CollectionAccent.of(collection.id);
     final mood = _mood;
     final items = mood == null
-        ? widget.items
-        : widget.items.where((w) => w.moods.contains(mood)).toList();
+        ? collection.items
+        : collection.items.where((w) => w.moods.contains(mood)).toList();
     final bottom = MediaQuery.paddingOf(context).bottom + 8;
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          _Header(
-            name: widget.name,
-            tagline: widget.tagline,
-            cover: Wallpaper.coverOf(widget.items),
-            accent: accent,
-          ),
+          _Header(collection: collection, accent: accent),
           if (_moods.isNotEmpty)
             SliverPersistentHeader(
               pinned: true,
@@ -105,22 +97,17 @@ class _CollectionPageState extends State<CollectionPage> {
 /// [FlexibleSpaceBar] scales its title and positions it per platform, and
 /// this header needs the name to sit still and fade.
 class _Header extends StatelessWidget {
-  final String name;
-  final String? tagline;
-  final Wallpaper? cover;
+  final Collection collection;
   final CollectionAccent accent;
 
-  const _Header({
-    required this.name,
-    required this.tagline,
-    required this.cover,
-    required this.accent,
-  });
+  const _Header({required this.collection, required this.accent});
 
   static const _expanded = 300.0;
 
   @override
   Widget build(BuildContext context) {
+    final name = collection.name;
+    final tagline = collection.tagline;
     final bg = Theme.of(context).scaffoldBackgroundColor;
     // The name sits on the part of the scrim that has become the page, so
     // it takes the page's text colour — white on the dark theme, near-black
@@ -129,6 +116,31 @@ class _Header extends StatelessWidget {
     final top = MediaQuery.paddingOf(context).top;
     final minHeight = kToolbarHeight + top;
     final maxHeight = _expanded + top;
+
+    // The layers that do not change as the bar collapses, built once here
+    // rather than in the LayoutBuilder below, which runs every scroll frame.
+    final cover = WallpaperThumb(
+      wallpaper: collection.cover,
+      memCacheWidth: 800,
+      fallback: bg,
+    );
+    // Two scrims: a light one at the top so the back button reads, and one
+    // dissolving into the page so the name does.
+    final scrim = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: const [0, 0.3, 0.65, 1],
+          colors: [
+            bg.withValues(alpha: 0.35),
+            bg.withValues(alpha: 0),
+            bg.withValues(alpha: 0.55),
+            bg,
+          ],
+        ),
+      ),
+    );
 
     return SliverAppBar(
       expandedHeight: _expanded,
@@ -161,32 +173,8 @@ class _Header extends StatelessWidget {
           return Stack(
             fit: StackFit.expand,
             children: [
-              if (cover != null)
-                CachedNetworkImage(
-                  imageUrl: cover!.thumbUrl,
-                  cacheManager: AppCache.thumbs,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 800,
-                  placeholder: (_, __) => ColoredBox(color: bg),
-                  errorWidget: (_, __, ___) => ColoredBox(color: bg),
-                ),
-              // Two scrims: a light one at the top so the back button reads,
-              // and one dissolving into the page so the name does.
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0, 0.3, 0.65, 1],
-                    colors: [
-                      bg.withValues(alpha: 0.35),
-                      bg.withValues(alpha: 0),
-                      bg.withValues(alpha: 0.55),
-                      bg,
-                    ],
-                  ),
-                ),
-              ),
+              cover,
+              scrim,
               // Solid as the bar collapses, so the pinned toolbar is a bar
               // and not a strip of somebody's photo.
               ColoredBox(color: bg.withValues(alpha: 1 - open)),
@@ -224,7 +212,7 @@ class _Header extends StatelessWidget {
                       if (tagline != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          tagline!,
+                          tagline,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(

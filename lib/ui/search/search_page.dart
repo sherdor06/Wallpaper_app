@@ -22,8 +22,8 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final _controller = TextEditingController();
-  late final Future<Catalog> _catalog =
-      WallpaperRepository.instance.fetchCatalog();
+  late final Future<Catalog> _catalog = WallpaperRepository.instance
+      .fetchCatalog();
   String _query = '';
 
   @override

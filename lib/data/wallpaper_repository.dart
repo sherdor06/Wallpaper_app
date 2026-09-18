@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 
 import '../config/app_config.dart';
+import '../models/collection.dart';
 import '../models/wallpaper.dart';
 
 /// Catalog result: categories + wallpapers.
@@ -13,9 +14,46 @@ class Catalog {
   final List<WallpaperCategory> categories;
   final List<Wallpaper> wallpapers;
 
-  const Catalog({required this.categories, required this.wallpapers});
+  Catalog({required this.categories, required this.wallpapers});
 
-  static const empty = Catalog(categories: [], wallpapers: []);
+  static final empty = Catalog(categories: const [], wallpapers: const []);
+
+  /// Wallpapers grouped by category id, built once per catalog. Every home
+  /// surface asks for a category's wallpapers, and a catalog of a couple of
+  /// thousand filtered a dozen times per build added up.
+  late final Map<String, List<Wallpaper>> _byCategory = () {
+    final out = <String, List<Wallpaper>>{};
+    for (final w in wallpapers) {
+      (out[w.category] ??= []).add(w);
+    }
+    return out;
+  }();
+
+  late final Map<String, WallpaperCategory> _meta = {
+    for (final c in categories) c.id: c,
+  };
+
+  /// The collection for [id], or null when the catalog has no wallpaper in
+  /// it. Name and tagline come from the catalog's category entry; a category
+  /// the config does not describe gets its id capitalised.
+  Collection? collection(String id) {
+    final items = _byCategory[id];
+    if (items == null) return null;
+    final meta = _meta[id];
+    return Collection(
+      id: id,
+      name: meta?.name ?? categoryLabel(id),
+      tagline: meta?.tagline,
+      items: items,
+    );
+  }
+
+  /// Every collection big enough to be a destination (see
+  /// [Collection.isDestination]), fullest first.
+  List<Collection> destinations() => [
+    for (final id in _byCategory.keys)
+      if (collection(id) case final c? when c.isDestination) c,
+  ]..sort((a, b) => b.items.length.compareTo(a.items.length));
 }
 
 /// Source of wallpapers.
@@ -77,7 +115,8 @@ class WallpaperRepository {
     final List wallpapersJson;
     final List categoriesJson;
     if (decoded is Map<String, dynamic>) {
-      wallpapersJson = (decoded['wallpapers'] ?? decoded['items'] ?? []) as List;
+      wallpapersJson =
+          (decoded['wallpapers'] ?? decoded['items'] ?? []) as List;
       categoriesJson = (decoded['categories'] ?? []) as List;
     } else if (decoded is List) {
       wallpapersJson = decoded;

@@ -25,6 +25,7 @@ import 'services/remote_config_service.dart';
 import 'services/theme_service.dart';
 import 'services/unlock_service.dart';
 import 'services/wallpaper_service.dart';
+import 'ui/accent.dart';
 import 'ui/splash_gate.dart';
 
 Future<void> main() async {
@@ -185,7 +186,7 @@ class _WallpaperAppState extends State<WallpaperApp> {
 
   ThemeData _theme(Brightness brightness) {
     final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF6C5CE7),
+      seedColor: kAccent,
       brightness: brightness,
     );
     final isDark = brightness == Brightness.dark;

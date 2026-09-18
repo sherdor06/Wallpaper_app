@@ -20,12 +20,12 @@ import '../services/deep_link_service.dart';
 import '../services/push_service.dart';
 import '../services/unlock_service.dart';
 import '../services/wallpaper_service.dart';
+import 'accent.dart';
 import 'widgets/badges.dart';
 import 'widgets/floating_chrome.dart';
 
-const _accent = Color(0xFF6C5CE7);
 const _accentDim = Color(0xFF5A4BC8);
-const _accentLight = Color(0xFF8B7BF0);
+const kAccentLight = Color(0xFF8B7BF0);
 const _success = Color(0xFF7EE2AC);
 const _warning = Color(0xFFF0A35E);
 
@@ -717,7 +717,7 @@ class _DetailPageState extends State<DetailPage> {
                         child: Container(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
-                                colors: [_accent, _accentLight]),
+                                colors: [kAccent, kAccentLight]),
                           ),
                         ),
                         builder: (context, value, child) =>
@@ -850,7 +850,7 @@ class _DetailPageState extends State<DetailPage> {
         _saveState == _SaveState.locked || _saveState == _SaveState.cancelled;
     if (!idle || !_locked) return null;
     return _chipBox(
-      color: _accent,
+      color: kAccent,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         const Icon(Icons.play_arrow_rounded, size: 14, color: Colors.white),
         const SizedBox(width: 4),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
+import '../accent.dart';
+
 /// Which full-screen format the stand-in is standing in for.
 enum AdStandInKind { interstitial, rewarded }
 
@@ -88,7 +90,7 @@ class AdStandIn extends StatelessWidget {
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
-                        colors: [Color(0xFF6C5CE7), Color(0xFF8E7BF5)],
+                        colors: [kAccent, kAccentLight],
                       ),
                     ),
                     child: Icon(icon, size: 40, color: Colors.white),
@@ -151,7 +153,7 @@ class _Caps extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     text,
     style: const TextStyle(
-      color: Color(0xFF8E7BF5),
+      color: kAccentLight,
       fontSize: 11,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.2,

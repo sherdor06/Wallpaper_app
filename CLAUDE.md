@@ -36,7 +36,18 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - Hero va muqova avto-nomli rasmlarni chetlab o'tadi (`Wallpaper.isAutoTitled`:
   "Cars 41", "Img" kabi) — ular ko'pincha noto'g'ri kategoriyada. Avto-nomli
   hero sarlavhasi kategoriya nomi ("Sport"), pastida "Wallpaper of the day".
-- 12 tadan kam rasmi bor kategoriya to'plam kartasi ham, spotlight ham olmaydi.
+- 12 tadan kam rasmi bor kategoriya to'plam kartasi ham, spotlight ham olmaydi
+  (`kMinCollectionSize`, `Collection.isDestination`).
+- To'plam bitta model: `models/collection.dart` `Collection` (id, name,
+  tagline, items, `cover`). Katalogdan `Catalog.collection(id)` yoki
+  `Catalog.destinations()` bilan olinadi — sahifada `wallpapers.where(...)`
+  yozilmaydi (guruhlash katalogda bir marta hisoblanadi). To'plam sahifasi
+  `openCollection(context, c)` bilan ochiladi, rasm — `openWallpaper`.
+- Thumbnail har joyda `WallpaperThumb` (`widgets/wallpaper_thumb.dart`):
+  `CachedNetworkImage` + `AppCache.thumbs` boilerplate qayta yozilmaydi.
+- Ilova aksenti `ui/accent.dart` (`kAccent`, `kAccentLight`,
+  `kAccentGradient`); fayl ichida `const _accent = Color(0xFF6C5CE7)`
+  ko'rinsa — xato.
 - Spotlight ("New collection" kartasi, hero ostida) Remote Config
   `featured_category` dan. Bo'sh → karta yo'q. Yangi to'plam chiqqanda konsolda
   id yoziladi, eskirgach tozalanadi — release kerak emas.

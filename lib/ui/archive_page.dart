@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../data/wallpaper_repository.dart';
 import '../models/wallpaper.dart';
 import '../services/history_service.dart';
+import 'accent.dart';
 import 'detail_page.dart';
 import 'widgets/app_loader.dart';
 import 'widgets/empty_state.dart';
@@ -16,7 +17,6 @@ import 'widgets/floating_chrome.dart';
 import 'widgets/wallpaper_grid.dart' show gridColumnsFor;
 import 'widgets/wallpaper_tile.dart';
 
-const _accent = Color(0xFF6C5CE7);
 
 /// Archive: the wallpapers the user has applied or saved, most recent first.
 ///
@@ -243,7 +243,7 @@ class _ArchivePageState extends State<ArchivePage> {
           buttonIcon: const CNSymbol('ellipsis', size: 18),
           buttonStyle: CNButtonStyle.glass,
           size: 36,
-          tint: _accent,
+          tint: kAccent,
           items: items,
           onSelected: (i) {
             if (i >= 0 && i < handlers.length) handlers[i]?.call();
@@ -328,7 +328,7 @@ class _ArchivePageState extends State<ArchivePage> {
                 allSelected ? 'checkmark.circle.fill' : 'checkmark.circle'),
             onPressed: items.isEmpty ? null : toggleAll,
             enabled: items.isNotEmpty,
-            tint: _accent,
+            tint: kAccent,
           ),
           CNButtonData(
             label: removeLabel,

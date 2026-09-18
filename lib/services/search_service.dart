@@ -25,7 +25,11 @@ class SearchFilter {
 
   /// Category id for a collection filter, mood id for a mood filter.
   final String id;
-  const SearchFilter({required this.label, required this.kind, required this.id});
+  const SearchFilter({
+    required this.label,
+    required this.kind,
+    required this.id,
+  });
 }
 
 enum SearchFilterKind { collection, mood }
@@ -69,7 +73,9 @@ class SearchService extends ChangeNotifier {
     if (q.isEmpty) return;
     _recent.removeWhere((e) => e.toLowerCase() == q.toLowerCase());
     _recent.insert(0, q);
-    if (_recent.length > _maxRecent) _recent.removeRange(_maxRecent, _recent.length);
+    if (_recent.length > _maxRecent) {
+      _recent.removeRange(_maxRecent, _recent.length);
+    }
     notifyListeners();
     try {
       await _file?.writeAsString(jsonEncode(_recent));
@@ -106,18 +112,32 @@ class SearchService extends ChangeNotifier {
         final hay = '${c.id} ${c.name} ${c.tagline ?? ''}'.toLowerCase();
         if (_hasWord(hay, w)) {
           (wordCategories[w] ??= {}).add(c.id);
-          if (!filters.any((f) => f.id == c.id && f.kind == SearchFilterKind.collection)) {
-            filters.add(SearchFilter(
-                label: c.name, kind: SearchFilterKind.collection, id: c.id));
+          if (!filters.any(
+            (f) => f.id == c.id && f.kind == SearchFilterKind.collection,
+          )) {
+            filters.add(
+              SearchFilter(
+                label: c.name,
+                kind: SearchFilterKind.collection,
+                id: c.id,
+              ),
+            );
           }
         }
       }
       for (final m in kMoodOrder) {
         if (m.startsWith(w) || moodLabel(m).toLowerCase().startsWith(w)) {
           (wordMoods[w] ??= {}).add(m);
-          if (!filters.any((f) => f.id == m && f.kind == SearchFilterKind.mood)) {
+          if (!filters.any(
+            (f) => f.id == m && f.kind == SearchFilterKind.mood,
+          )) {
             filters.add(
-                SearchFilter(label: moodLabel(m), kind: SearchFilterKind.mood, id: m));
+              SearchFilter(
+                label: moodLabel(m),
+                kind: SearchFilterKind.mood,
+                id: m,
+              ),
+            );
           }
         }
       }

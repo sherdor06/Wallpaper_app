@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../accent.dart';
+
 /// The colour a collection is dressed in: its section dot and "See all" on
 /// the home screen, the spotlight chip, and the accent bar and chips on its
 /// own page.
@@ -15,7 +17,7 @@ class CollectionAccent {
   const CollectionAccent(this.color, this.colorEnd);
 
   /// The app accent, as a [CollectionAccent] so callers never branch.
-  static const app = CollectionAccent(Color(0xFF6C5CE7), Color(0xFF8E7BF5));
+  static const app = CollectionAccent(kAccent, kAccentLight);
 
   static const _custom = <String, CollectionAccent>{
     // Girly is the pink one; Aesthetic moved to lavender so the two rows

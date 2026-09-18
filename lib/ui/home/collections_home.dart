@@ -1,9 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/wallpaper_repository.dart';
-import '../../models/wallpaper.dart';
-import '../../services/image_cache.dart';
+import '../../models/collection.dart';
+import '../widgets/wallpaper_thumb.dart';
 import '../widgets/wallpaper_grid.dart' show gridColumnsFor;
 import 'collection_page.dart';
 
@@ -11,8 +10,7 @@ import 'collection_page.dart';
 ///
 /// Replaces the chip row's job with something that can be seen rather than
 /// read. Categories are ordered by size, fullest first, and the thin ones are
-/// left out altogether — a card promising a collection and delivering three
-/// wallpapers is worse than no card.
+/// left out altogether (see [Collection.isDestination]).
 class CollectionsHome extends StatelessWidget {
   final Catalog catalog;
   final Future<void> Function() onRefresh;
@@ -25,33 +23,9 @@ class CollectionsHome extends StatelessWidget {
     required this.topPadding,
   });
 
-  /// Fewest wallpapers a category needs to earn a card. Below this the
-  /// category still exists — its wallpapers are in every "Browse all" grid —
-  /// it just is not advertised as a destination.
-  static const _minItems = 12;
-
-  List<_Collection> _collections() {
-    final byId = <String, List<Wallpaper>>{};
-    for (final w in catalog.wallpapers) {
-      (byId[w.category] ??= []).add(w);
-    }
-    final meta = {for (final c in catalog.categories) c.id: c};
-    final out = [
-      for (final e in byId.entries)
-        if (e.value.length >= _minItems)
-          _Collection(
-            id: e.key,
-            name: meta[e.key]?.name ?? categoryLabel(e.key),
-            tagline: meta[e.key]?.tagline,
-            items: e.value,
-          ),
-    ]..sort((a, b) => b.items.length.compareTo(a.items.length));
-    return out;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final collections = _collections();
+    final collections = catalog.destinations();
     final bottom = MediaQuery.paddingOf(context).bottom + 8;
 
     return RefreshIndicator(
@@ -70,16 +44,7 @@ class CollectionsHome extends StatelessWidget {
           itemCount: collections.length,
           itemBuilder: (context, i) => _CollectionCard(
             collection: collections[i],
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => CollectionPage(
-                  id: collections[i].id,
-                  name: collections[i].name,
-                  tagline: collections[i].tagline,
-                  items: collections[i].items,
-                ),
-              ),
-            ),
+            onTap: () => openCollection(context, collections[i]),
           ),
         ),
       ),
@@ -87,31 +52,18 @@ class CollectionsHome extends StatelessWidget {
   }
 }
 
-class _Collection {
-  final String id;
-  final String name;
-  final List<Wallpaper> items;
-  final String? tagline;
-  const _Collection({
-    required this.id,
-    required this.name,
-    required this.items,
-    this.tagline,
-  });
-}
-
-/// Cover image, name, tagline. The cover is [Wallpaper.coverOf] the set — the
-/// first *titled* wallpaper, since the auto-titled ones are the likeliest to
-/// be filed in the wrong category and a Space card wearing a car is worse
-/// than no card.
+/// Cover image, name, tagline. The cover is [Collection.cover] — the first
+/// *titled* wallpaper, since the auto-titled ones are the likeliest to be
+/// filed in the wrong category and a Space card wearing a car is worse than
+/// no card.
 class _CollectionCard extends StatelessWidget {
-  final _Collection collection;
+  final Collection collection;
   final VoidCallback onTap;
   const _CollectionCard({required this.collection, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final cover = Wallpaper.coverOf(collection.items)!;
+    final tagline = collection.tagline;
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
@@ -119,16 +71,7 @@ class _CollectionCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CachedNetworkImage(
-              imageUrl: cover.thumbUrl,
-              cacheManager: AppCache.thumbs,
-              fit: BoxFit.cover,
-              memCacheWidth: 360,
-              placeholder: (_, __) =>
-                  const ColoredBox(color: Color(0xFF1B1B22)),
-              errorWidget: (_, __, ___) =>
-                  const ColoredBox(color: Color(0xFF1B1B22)),
-            ),
+            WallpaperThumb(wallpaper: collection.cover, memCacheWidth: 360),
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -158,10 +101,10 @@ class _CollectionCard extends StatelessWidget {
                       height: 1.25,
                     ),
                   ),
-                  if (collection.tagline != null) ...[
+                  if (tagline != null) ...[
                     const SizedBox(height: 2),
                     Text(
-                      collection.tagline!,
+                      tagline,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

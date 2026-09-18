@@ -1,26 +1,15 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/wallpaper_repository.dart';
+import '../../models/collection.dart';
 import '../../models/wallpaper.dart';
-import '../../services/image_cache.dart';
 import '../../services/remote_config_service.dart';
+import '../accent.dart';
+import '../widgets/wallpaper_thumb.dart';
 import '../widgets/wallpaper_grid.dart';
 import 'category_carousel.dart';
 import 'collection_accent.dart';
 import 'collection_page.dart';
-
-/// A themed row on the editorial home: a title and the category it draws from.
-///
-/// Kept as data rather than widgets so the line-up can move to Remote Config
-/// without touching layout — and so a new category is one entry here, not a
-/// new screen. A row whose category has no wallpapers yet is skipped, so an
-/// entry can go in ahead of its content.
-class HomeSection {
-  final String title;
-  final String category;
-  const HomeSection(this.title, this.category);
-}
 
 /// The curated home: a wallpaper of the day, a few themed rows, then the whole
 /// catalog in the familiar grid.
@@ -42,21 +31,12 @@ class EditorialHome extends StatelessWidget {
     required this.topPadding,
   });
 
-  /// Rows shown, in order. Empty categories are skipped at build time.
-  /// The two accented collections lead (see [CollectionAccent]) — they are
-  /// what the home screen exists to surface.
-  static const _sections = [
-    HomeSection('Girly', 'girly'),
-    HomeSection('Aesthetic', 'aesthetic'),
-    HomeSection('Popular', 'popular'),
-    HomeSection('Nature', 'nature'),
-    HomeSection('Space', 'space'),
-  ];
-
-  /// Fewest wallpapers the spotlighted category needs before it is
-  /// announced — same bar as a collection card. Announcing a collection that
-  /// opens onto five wallpapers would be worse than saying nothing.
-  static const _minSpotlight = 12;
+  /// Rows shown, in order, as category ids; names and taglines come from
+  /// the catalog. A row whose category has no wallpapers yet is skipped, so
+  /// an id can go in ahead of its content. The two accented collections
+  /// lead (see [CollectionAccent]) — they are what the home screen exists
+  /// to surface.
+  static const _sections = ['girly', 'aesthetic', 'popular', 'nature', 'space'];
 
   /// How many tiles a row carries. Enough to scroll into, few enough that the
   /// row still reads as a taste of the category rather than the category.
@@ -78,43 +58,27 @@ class EditorialHome extends StatelessWidget {
     return pool[day % pool.length];
   }
 
+  /// The collection for [id] if it is big enough to be advertised — the
+  /// bar for the carousel and the spotlight alike (see
+  /// [Collection.isDestination]).
+  Collection? _destination(String id) {
+    final c = catalog.collection(id);
+    return c != null && c.isDestination ? c : null;
+  }
+
   /// The carousel's line-up: Remote Config's order, minus anything the
   /// catalog cannot back with a card's worth of wallpapers.
-  List<CarouselCollection> _carousel() {
-    final meta = {for (final c in catalog.categories) c.id: c};
-    final out = <CarouselCollection>[];
-    for (final id in RemoteConfigService.instance.homeStrip) {
-      final items = catalog.wallpapers.where((w) => w.category == id).toList();
-      if (items.length < _minSpotlight) continue;
-      out.add(
-        CarouselCollection(
-          id: id,
-          name: meta[id]?.name ?? categoryLabel(id),
-          tagline: meta[id]?.tagline,
-          items: items,
-        ),
-      );
-    }
-    return out;
-  }
+  List<Collection> _carousel() => [
+    for (final id in RemoteConfigService.instance.homeStrip)
+      if (_destination(id) case final c?) c,
+  ];
 
   /// The collection Remote Config says to announce, if it exists and has
   /// enough in it. Read at build so a config change shows on the next open
   /// without a restart being needed anywhere.
-  _Featured? _featured() {
+  Collection? _featured() {
     final id = RemoteConfigService.instance.featuredCategory;
-    if (id.isEmpty) return null;
-    final items = catalog.wallpapers.where((w) => w.category == id).toList();
-    final cover = Wallpaper.coverOf(items);
-    if (items.length < _minSpotlight || cover == null) return null;
-    final meta = catalog.categories.where((c) => c.id == id).firstOrNull;
-    return _Featured(
-      id: id,
-      name: meta?.name ?? categoryLabel(id),
-      tagline: meta?.tagline,
-      items: items,
-      cover: cover,
-    );
+    return id.isEmpty ? null : _destination(id);
   }
 
   @override
@@ -136,19 +100,18 @@ class EditorialHome extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 16),
                 child: CategoryCarousel(
                   collections: carousel,
-                  onOpen: (c) => _open(context, c.id, c.name, c.items),
+                  onOpen: (c) => openCollection(context, c),
                 ),
               ),
             ),
           if (featured != null)
             SliverToBoxAdapter(
               child: _Spotlight(
-                featured: featured,
-                onTap: () =>
-                    _open(context, featured.id, featured.name, featured.items),
+                collection: featured,
+                onTap: () => openCollection(context, featured),
               ),
             ),
-          for (final s in _sections) ..._section(context, s),
+          for (final id in _sections) ..._section(context, id),
           SliverToBoxAdapter(
             child: _SectionHeader(title: 'Browse all', onSeeAll: null),
           ),
@@ -159,38 +122,18 @@ class EditorialHome extends StatelessWidget {
     );
   }
 
-  void _open(
-    BuildContext context,
-    String id,
-    String name,
-    List<Wallpaper> items,
-  ) {
-    final tagline = catalog.categories
-        .where((c) => c.id == id)
-        .firstOrNull
-        ?.tagline;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            CollectionPage(id: id, name: name, tagline: tagline, items: items),
-      ),
-    );
-  }
-
-  List<Widget> _section(BuildContext context, HomeSection s) {
-    final items = catalog.wallpapers
-        .where((w) => w.category == s.category)
-        .toList();
-    if (items.isEmpty) return const [];
-    // The header (title included), the "See all" pill and the trailing "+N"
+  List<Widget> _section(BuildContext context, String id) {
+    final collection = catalog.collection(id);
+    if (collection == null) return const [];
+    // The header (title included), the "See all" pill and the trailing
     // card open the collection; the tiles open their wallpaper, as tiles do
     // everywhere else in the app.
-    void open() => _open(context, s.category, s.title, items);
+    void open() => openCollection(context, collection);
     return [
       SliverToBoxAdapter(
         child: _SectionHeader(
-          title: s.title,
-          accent: CollectionAccent.custom(s.category),
+          title: collection.name,
+          accent: CollectionAccent.custom(id),
           onSeeAll: open,
         ),
       ),
@@ -198,8 +141,8 @@ class EditorialHome extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: _Row(
-            items: items.take(_rowLength).toList(),
-            accent: CollectionAccent.of(s.category),
+            items: collection.items.take(_rowLength).toList(),
+            accent: CollectionAccent.of(id),
             onTap: open,
           ),
         ),
@@ -237,16 +180,7 @@ class _Hero extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                CachedNetworkImage(
-                  imageUrl: wallpaper.thumbUrl,
-                  cacheManager: AppCache.thumbs,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 800,
-                  placeholder: (_, __) =>
-                      const ColoredBox(color: Color(0xFF1B1B22)),
-                  errorWidget: (_, __, ___) =>
-                      const ColoredBox(color: Color(0xFF1B1B22)),
-                ),
+                WallpaperThumb(wallpaper: wallpaper, memCacheWidth: 800),
                 // Scrim so the title reads on any image; matches the dark
                 // scaffold so it looks like the card dissolves into the page.
                 const DecoratedBox(
@@ -268,9 +202,7 @@ class _Hero extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6C5CE7), Color(0xFF8E7BF5)],
-                      ),
+                      gradient: kAccentGradient,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Text(
@@ -324,33 +256,18 @@ class _Hero extends StatelessWidget {
   }
 }
 
-/// What the spotlight announces, resolved once per build.
-class _Featured {
-  final String id;
-  final String name;
-  final List<Wallpaper> items;
-  final Wallpaper cover;
-  final String? tagline;
-  const _Featured({
-    required this.id,
-    required this.name,
-    required this.items,
-    required this.cover,
-    this.tagline,
-  });
-}
-
 /// The "new collection" card under the hero. Wide and short so it reads as an
 /// announcement, not a second hero; the cover shows through on the right and
 /// the words sit on a scrim on the left.
 class _Spotlight extends StatelessWidget {
-  final _Featured featured;
+  final Collection collection;
   final VoidCallback onTap;
-  const _Spotlight({required this.featured, required this.onTap});
+  const _Spotlight({required this.collection, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final accent = CollectionAccent.of(featured.id);
+    final accent = CollectionAccent.of(collection.id);
+    final tagline = collection.tagline;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: GestureDetector(
@@ -362,16 +279,7 @@ class _Spotlight extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                CachedNetworkImage(
-                  imageUrl: featured.cover.thumbUrl,
-                  cacheManager: AppCache.thumbs,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 800,
-                  placeholder: (_, __) =>
-                      const ColoredBox(color: Color(0xFF1B1B22)),
-                  errorWidget: (_, __, ___) =>
-                      const ColoredBox(color: Color(0xFF1B1B22)),
-                ),
+                WallpaperThumb(wallpaper: collection.cover, memCacheWidth: 800),
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -417,7 +325,7 @@ class _Spotlight extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            featured.name,
+                            collection.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -427,10 +335,10 @@ class _Spotlight extends StatelessWidget {
                               height: 1.15,
                             ),
                           ),
-                          if (featured.tagline != null) ...[
+                          if (tagline != null) ...[
                             const SizedBox(height: 3),
                             Text(
-                              featured.tagline!,
+                              tagline,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -591,16 +499,7 @@ class _Row extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               child: SizedBox(
                 width: _width,
-                child: CachedNetworkImage(
-                  imageUrl: w.thumbUrl,
-                  cacheManager: AppCache.thumbs,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 360,
-                  placeholder: (_, __) =>
-                      const ColoredBox(color: Color(0xFF1B1B22)),
-                  errorWidget: (_, __, ___) =>
-                      const ColoredBox(color: Color(0xFF1B1B22)),
-                ),
+                child: WallpaperThumb(wallpaper: w, memCacheWidth: 360),
               ),
             ),
           );

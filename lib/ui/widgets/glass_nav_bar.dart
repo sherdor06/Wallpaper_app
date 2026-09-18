@@ -2,8 +2,8 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-const _accent = Color(0xFF6C5CE7);
-const _accentLight = Color(0xFF8E7BF5);
+import '../accent.dart';
+
 
 /// One destination in [GlassNavBar] / [CircleNavBar].
 class GlassNavItem {
@@ -116,11 +116,11 @@ class CircleNavBar extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
-                        colors: [_accent, _accentLight],
+                        colors: [kAccent, kAccentLight],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: _accent.withValues(alpha: 0.5),
+                          color: kAccent.withValues(alpha: 0.5),
                           blurRadius: 16,
                           spreadRadius: -1,
                         ),
@@ -194,11 +194,11 @@ class _NavStack extends StatelessWidget {
             widthFactor: 1 / items.length,
             child: Container(
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [_accent, _accentLight]),
+                gradient: const LinearGradient(colors: [kAccent, kAccentLight]),
                 borderRadius: BorderRadius.circular(pillRadius),
                 boxShadow: [
                   BoxShadow(
-                    color: _accent.withValues(alpha: 0.45),
+                    color: kAccent.withValues(alpha: 0.45),
                     blurRadius: 16,
                     spreadRadius: -2,
                   ),

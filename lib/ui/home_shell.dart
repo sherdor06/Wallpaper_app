@@ -4,6 +4,7 @@ import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/material.dart';
 
 import '../services/home_layout_service.dart';
+import 'accent.dart';
 import 'archive_page.dart';
 import 'favorites_tab.dart';
 import 'home_tab.dart';
@@ -13,7 +14,6 @@ import 'widgets/ad_banner_placeholder.dart';
 import 'widgets/floating_chrome.dart';
 import 'widgets/glass_nav_bar.dart';
 
-const _accent = Color(0xFF6C5CE7);
 
 /// Fraction of the native iOS tab bar's measured height that stays in the
 /// layout. UIKit reports a height that includes home-indicator room at the
@@ -213,7 +213,7 @@ class _HomeShellState extends State<HomeShell> {
           child: CNTabBar(
             currentIndex: _index,
             onTap: _select,
-            tint: _accent,
+            tint: kAccent,
             // The last item rides alone on the right: a round glass pill
             // for Search, the shape Apple gives it.
             split: true,

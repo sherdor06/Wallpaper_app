@@ -31,15 +31,16 @@ class SearchBody extends StatelessWidget {
     required this.topPadding,
   });
 
-  /// Collections offered as chips: the ones big enough to be a destination.
-  static const _minItems = 12;
-
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom + 8;
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
-      return _Browse(catalog: catalog, onQuery: onQuery, topPadding: topPadding);
+      return _Browse(
+        catalog: catalog,
+        onQuery: onQuery,
+        topPadding: topPadding,
+      );
     }
     final result = SearchService.search(catalog, trimmed);
     return CustomScrollView(
@@ -79,14 +80,18 @@ class _ResultHeader extends StatelessWidget {
       runSpacing: 6,
       children: [
         Text.rich(
-          TextSpan(children: [
-            TextSpan(
-              text: '$n',
-              style: TextStyle(
-                  color: scheme.onSurface, fontWeight: FontWeight.w700),
-            ),
-            TextSpan(text: n == 1 ? ' result' : ' results'),
-          ]),
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '$n',
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              TextSpan(text: n == 1 ? ' result' : ' results'),
+            ],
+          ),
           style: TextStyle(
             color: scheme.onSurface.withValues(alpha: 0.6),
             fontSize: 13,
@@ -112,17 +117,16 @@ class _Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style:
-              TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700),
+    ),
+  );
 }
 
 class _Nothing extends StatelessWidget {
@@ -136,25 +140,30 @@ class _Nothing extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
       child: Column(
         children: [
-          Icon(Icons.search_off_rounded,
-              size: 40, color: scheme.onSurface.withValues(alpha: 0.3)),
+          Icon(
+            Icons.search_off_rounded,
+            size: 40,
+            color: scheme.onSurface.withValues(alpha: 0.3),
+          ),
           const SizedBox(height: 12),
           Text(
             'Nothing for "$query"',
             textAlign: TextAlign.center,
             style: TextStyle(
-                color: scheme.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.w700),
+              color: scheme.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             'Try a collection or a mood — Girly, Nature, Dark, Light.',
             textAlign: TextAlign.center,
             style: TextStyle(
-                color: scheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 13,
-                height: 1.4),
+              color: scheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 13,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -167,20 +176,18 @@ class _Browse extends StatelessWidget {
   final Catalog catalog;
   final ValueChanged<String> onQuery;
   final double topPadding;
-  const _Browse(
-      {required this.catalog, required this.onQuery, required this.topPadding});
+  const _Browse({
+    required this.catalog,
+    required this.onQuery,
+    required this.topPadding,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final counts = <String, int>{};
-    for (final w in catalog.wallpapers) {
-      counts[w.category] = (counts[w.category] ?? 0) + 1;
-    }
-    final collections = [
-      for (final c in catalog.categories)
-        if ((counts[c.id] ?? 0) >= SearchBody._minItems) c,
-    ]..sort((a, b) => (counts[b.id] ?? 0).compareTo(counts[a.id] ?? 0));
+    // Chips for what search can actually find: the collections big enough
+    // to be a destination, fullest first.
+    final collections = catalog.destinations();
 
     return ListenableBuilder(
       listenable: SearchService.instance,
@@ -189,7 +196,11 @@ class _Browse extends StatelessWidget {
         return ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
-              16, topPadding, 16, MediaQuery.paddingOf(context).bottom + 16),
+            16,
+            topPadding,
+            16,
+            MediaQuery.paddingOf(context).bottom + 16,
+          ),
           children: [
             if (recent.isNotEmpty) ...[
               Row(
@@ -200,9 +211,10 @@ class _Browse extends StatelessWidget {
                     child: Text(
                       'Clear',
                       style: TextStyle(
-                          color: scheme.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700),
+                        color: scheme.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -215,17 +227,22 @@ class _Browse extends StatelessWidget {
                     height: 44,
                     child: Row(
                       children: [
-                        Icon(Icons.history_rounded,
-                            size: 18,
-                            color: scheme.onSurface.withValues(alpha: 0.5)),
+                        Icon(
+                          Icons.history_rounded,
+                          size: 18,
+                          color: scheme.onSurface.withValues(alpha: 0.5),
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(r,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  color: scheme.onSurface.withValues(alpha: 0.85),
-                                  fontSize: 15)),
+                          child: Text(
+                            r,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: scheme.onSurface.withValues(alpha: 0.85),
+                              fontSize: 15,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -256,7 +273,9 @@ class _Browse extends StatelessWidget {
               children: [
                 for (final m in kMoodOrder)
                   _BrowseChip(
-                      label: moodLabel(m), onTap: () => onQuery(moodLabel(m))),
+                    label: moodLabel(m),
+                    onTap: () => onQuery(moodLabel(m)),
+                  ),
               ],
             ),
           ],
@@ -272,14 +291,14 @@ class _Caps extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.6,
-        ),
-      );
+    text.toUpperCase(),
+    style: TextStyle(
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.6,
+    ),
+  );
 }
 
 class _BrowseChip extends StatelessWidget {
@@ -292,7 +311,9 @@ class _BrowseChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final idle = dark ? const Color(0x14FFFFFF) : const Color(0x0F000000);
-    final text = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85);
+    final text = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.85);
     return GestureDetector(
       onTap: onTap,
       // No `alignment` here: inside a Wrap that would make the box take the
@@ -313,13 +334,21 @@ class _BrowseChip extends StatelessWidget {
               Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: accent,
+                  shape: BoxShape.circle,
+                ),
               ),
               const SizedBox(width: 8),
             ],
-            Text(label,
-                style: TextStyle(
-                    color: text, fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: TextStyle(
+                color: text,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),

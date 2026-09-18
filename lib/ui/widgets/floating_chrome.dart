@@ -4,8 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-const _accent = Color(0xFF6C5CE7);
-const _accentLight = Color(0xFF8E7BF5);
+import '../accent.dart';
+
 
 /// True on iOS 26+, where the native Liquid Glass controls (tab bar, popup
 /// menus) are available. [Platform.operatingSystemVersion] is a free-form
@@ -282,12 +282,12 @@ class _SegmentedPillState<T extends Object> extends State<SegmentedPill<T>>
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [_accent, _accentLight],
+                            colors: [kAccent, kAccentLight],
                           ),
                           borderRadius: BorderRadius.circular(disc / 2),
                           boxShadow: [
                             BoxShadow(
-                              color: _accent.withValues(alpha: 0.45),
+                              color: kAccent.withValues(alpha: 0.45),
                               blurRadius: 10,
                             ),
                           ],
@@ -399,7 +399,7 @@ class ChromePillButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 18, color: _accent),
+            Icon(icon, size: 18, color: kAccent),
             const SizedBox(width: 8),
           ],
           Text(
@@ -476,7 +476,7 @@ class ChromeSearchField extends StatelessWidget {
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
-              cursorColor: _accentLight,
+              cursorColor: kAccentLight,
               decoration: InputDecoration(
                 isCollapsed: true,
                 border: InputBorder.none,
@@ -602,8 +602,8 @@ class _OrbitBorderPainter extends CustomPainter {
       colors: const [
         _transparent,
         _transparent,
-        _accent,
-        _accentLight,
+        kAccent,
+        kAccentLight,
         Colors.white70,
         _transparent,
       ],
