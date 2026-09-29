@@ -44,6 +44,17 @@ dependencies:
   url_launcher: ^6.3.0            # tashqi havolalar (privacy, rate, email)
   flutter_cache_manager: ^3.4.1  # keshni tozalash (Settings)
   package_info_plus: ^8.1.0       # app versiyasini pubspec'dan olish (Settings)
+  # Upgrade these as a set, never one at a time. Each FlutterFire release is
+  # built against one exact firebase-ios-sdk version. Under Swift Package
+  # Manager every plugin pins it with `exact:`, so two plugins from different
+  # releases make resolution fail outright (seen: crashlytics 5.2.7 wanting
+  # 12.17.0 against remote_config 6.6.0 wanting 12.18.0). This project is on
+  # CocoaPods now (see `config` under `flutter:` below), where the plugins
+  # follow firebase_core's version instead — but a plugin's native code still
+  # expects the SDK of its own release. Caret ranges protect neither case: pub
+  # only sees the Dart side.
+  #   flutter pub upgrade firebase_core firebase_analytics firebase_crashlytics \
+  #     firebase_messaging firebase_remote_config
   firebase_core: ^4.12.0
   firebase_analytics: ^12.4.4
   firebase_crashlytics: ^5.2.5
@@ -108,6 +119,17 @@ flutter_native_splash:
 
 # The following section is specific to Flutter packages.
 flutter:
+
+  # iOS plugins go through CocoaPods only, for this project alone (the global
+  # Flutter setting stays on). yandex_mobileads has no Swift Package Manager
+  # support, so it is always a pod — and its YandexMobileAds pod pulls
+  # AppMetricaCrashes -> KSCrash. With SPM on, appmetrica_plugin brought a
+  # second KSCrash through SPM, the two resolvers never saw each other, and the
+  # link failed on 2183 duplicate symbols. One resolver means one KSCrash.
+  # Revisit once yandex_mobileads ships a Package.swift — Flutter has said
+  # opting out will eventually stop being allowed.
+  config:
+    enable-swift-package-manager: false
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
