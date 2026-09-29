@@ -201,6 +201,33 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - `AndroidManifest.xml` izohlarida `--` ishlatilmaydi — XML buni taqiqlaydi va
   Android build butunlay yiqiladi (iOS sezmaydi).
 
+## Build muammolari
+
+- `flutter run` ilova ochilishidan oldin yiqilsa (simulyator, emulator yoki
+  qurilma) — avval `python3 scripts/doctor.py`. U shu loyihada haqiqatan
+  bo'lgan har bir nosozlikni tekshiradi: mahalliy holatni o'zi tiklaydi
+  (Flutter engine keshi, `pub get`, `pod install`, binary'siz qolgan
+  `Flutter.framework`), git'dagi faylni o'zgartiradiganini faqat aytadi.
+  Yangi turdagi nosozlik tuzatilsa — shu skriptga tekshiruv qo'shiladi.
+- iOS plaginlari faqat CocoaPods orqali: `pubspec.yaml` →
+  `flutter: config: enable-swift-package-manager: false`. `yandex_mobileads`
+  SPM'ni bilmaydi; SPM yoqilsa KSCrash ikki marta linklanadi (2183
+  duplicate symbol). Global Flutter sozlamasiga tegilmaydi.
+- Firebase oktabr 2026 dan keyin CocoaPods'ga yangi versiya chiqarmaydi.
+  Keyingi Firebase yangilanishidan oldin SPM masalasi hal qilinadi:
+  `yandex_mobileads` `Package.swift` chiqargan bo'lsa SPM qayta yoqiladi,
+  bo'lmasa `appmetrica_plugin` dan voz kechish ko'riladi.
+- Firebase plaginlari faqat birga yangilanadi (buyruq `pubspec.yaml` da).
+- `pod install` qo'lda — `LANG=en_US.UTF-8` bilan, aks holda CocoaPods'ning
+  xato hisobotchisi yiqilib, asl xatoni yashiradi.
+- Android Studio yoki terminaldan run qilganda Xcode yopiq turadi: bitta
+  workspace'da ikki build servis "Could not compute dependency graph"
+  beradi va paketlarni ikki marta resolve qiladi.
+- 2026-09-29 da Flutter SDK keshidan uchala rejimning simulator `Flutter`
+  binary'lari birdaniga yo'qolgan (sababi aniqlanmadi). Belgisi: "Binary …
+  does not exist, cannot thin". Doctor buni `flutter precache --ios
+  --force` bilan tiklaydi.
+
 ## Loyiha faktlari
 
 - Play Store'da jonli: `1.0.1+4`. Keyingi release: `1.0.2+5` (share, App Links,
