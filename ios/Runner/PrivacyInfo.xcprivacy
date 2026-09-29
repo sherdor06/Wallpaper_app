@@ -5,8 +5,8 @@
 
   Scope: this file covers the Runner target only. Every SDK ships its own
   manifest and Xcode merges them at build time — Flutter.framework declares the
-  engine's file-timestamp and boot-time use, and the 42 pods (AdMob, Firebase,
-  AppMetrica, …) declare theirs. So NSPrivacyAccessedAPITypes is empty here:
+  engine's file-timestamp and boot-time use, and the pods (Yandex Mobile Ads,
+  Firebase, AppMetrica, …) declare theirs. So NSPrivacyAccessedAPITypes is empty here:
   the app's own Swift (AppDelegate's PhotoKit save and `fileExists`) touches no
   required-reason API.
 
@@ -15,10 +15,11 @@
 -->
 <plist version="1.0">
 <dict>
-  <!-- True because AdMob serves personalised ads and AppMetrica does install
-       attribution. This is the declaration that must match the ATT prompt in
-       AdService._requestTrackingAuthorization(); claiming tracking without ever
-       asking, or asking without declaring, is a review rejection either way. -->
+  <!-- True because Yandex Mobile Ads serves personalised ads and AppMetrica
+       does install attribution. This is the declaration that must match the
+       ATT prompt in AdService._requestTrackingAuthorization(); claiming
+       tracking without ever asking, or asking without declaring, is a review
+       rejection either way. -->
   <key>NSPrivacyTracking</key>
   <true/>
 
@@ -27,15 +28,11 @@
        Ad serving and attribution are listed; crash reporting and Remote Config
        are not, since they identify no one across apps.
 
-       Google's ad domains are gone with AdMob — these are AppLovin MAX, the
-       Yandex network mediated inside it, and AppMetrica for attribution. If
-       another network is switched on in the MAX dashboard, its domains belong
-       here too, or ATT denial will not actually stop its tracking. -->
+       Yandex Mobile Ads is served directly, with no mediation layer, and
+       AppMetrica does attribution. Any ad network added later brings its
+       domains here too, or ATT denial will not actually stop its tracking. -->
   <key>NSPrivacyTrackingDomains</key>
   <array>
-    <string>ms.applovin.com</string>
-    <string>rt.applovin.com</string>
-    <string>prod-a.applovin.com</string>
     <string>ad.mail.ru</string>
     <string>mobile.yandexadexchange.net</string>
     <string>report.appmetrica.yandex.net</string>
@@ -45,7 +42,7 @@
 
   <key>NSPrivacyCollectedDataTypes</key>
   <array>
-    <!-- IDFA/IDFV via AdMob and AppMetrica. Linked to the user and used for
+    <!-- IDFA/IDFV via Yandex Mobile Ads and AppMetrica. Linked to the user and used for
          tracking — this is the entry ATT actually gates. -->
     <dict>
       <key>NSPrivacyCollectedDataType</key>
@@ -77,7 +74,7 @@
       </array>
     </dict>
 
-    <!-- Impressions and rewarded completions reported back to AdMob. -->
+    <!-- Impressions and rewarded completions reported back to Yandex. -->
     <dict>
       <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeAdvertisingData</string>
