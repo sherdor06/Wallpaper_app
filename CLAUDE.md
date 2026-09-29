@@ -23,6 +23,17 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - Tizim kontrollari tizim rangida qoladi (iOS switch — yashil). Ilova aksenti
   (`#6C5CE7 → #8E7BF5`) faqat ilova o'zi chizgan elementlarda.
 - Yangi qayta ishlatiladigan chrome widget → `floating_chrome.dart` ga.
+- Pastdan chiqadigan panel — `ChromeSheet` (`floating_chrome.dart`). iOS'da
+  Maps kartasi: shaffof qorong'i glass (`GlassContainer`), chetlardan 10pt,
+  burchak 44 — har qanday balandlikda ham chetga yopishmaydi. Paketning
+  `GlassModalSheet`i ishlatilmaydi: u half holatida kartani chetma-chet
+  "page sheet"ga morph qiladi va buni o'chirib bo'lmaydi. Android'da solid
+  Material sheet. Balandlik kontentdan (`AnimatedSize`), detent raqami yo'q.
+  `Stack`ning to'g'ridan-to'g'ri farzandi bo'ladi.
+- Rasm ustidagi chrome `ChromeOverImage` ichida turadi: iOS'da kontent oq,
+  glass qorong'i — ilova temasidan qat'i nazar (sahna doim qorong'i).
+  Android'ga tegmaydi. Sheet'ning header/body'si `Builder` orqali beriladi,
+  toki rangni sahifa context'idan emas, turgan joyidagi temadan o'qisin.
 - `SegmentedPill` — 2–3 element uchun; forma kontroli sifatida ishlatilmaydi.
   Ikkala platformada bir xil, glass yo'q: istalgan joyi bosilsa keyingisiga
   o'tadi; aksent disk siljimaydi, *cho'ziladi* (oldingi chet avval ketadi,
@@ -124,6 +135,11 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - Kutubxona fonda yuklanadi; uni ochgan sahifa tayyor bo'lishini kutadi.
   Saqlangan ro'yxat o'zgarmas snapshot: faqat yozilganda yangilanadi,
   grid katagini chizish uchun har safar butun ro'yxat nusxalanmaydi.
+- Studio editori yig'ilgan holda ochiladi: tutqich, tablar va "Preview
+  wallpaper" — dunyo birinchi bo'lib deyarli butun ko'rinadi. Tab bosilsa
+  sheet o'sha tabga ochiladi; ochiq tab qayta bosilsa, sheet pastga
+  surilsa yoki rasmga teginilsa — yig'iladi. Yig'ilganda hech bir tab
+  tanlangan ko'rinmaydi. Preview rejimida ham shu sheet, body'siz.
 - Yangi Swift fayl Xcode target'ga `xcodeproj` gem bilan qo'shiladi
   (CocoaPods bilan keladi), pbxproj qo'lda tahrirlanmaydi.
 

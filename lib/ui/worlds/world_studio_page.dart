@@ -33,6 +33,11 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
   bool _homePreview = false;
   bool _leaving = false;
   _StudioTab _tab = _StudioTab.atmosphere;
+
+  /// Whether the editor sheet shows the open tab's controls. It starts
+  /// folded — handle, tabs and the preview button — so the world is the
+  /// first thing seen, nearly whole, rather than half a panel of sliders.
+  bool _expanded = false;
   WorldSettings get _settings => _world.settings;
   bool get _dirty =>
       _settings != _baseline ||
@@ -80,6 +85,21 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
     if (remember) _remember();
     setState(() => _world = _world.copyWith(settings: value));
   }
+
+  void _setExpanded(bool value) {
+    if (value != _expanded) setState(() => _expanded = value);
+  }
+
+  /// A tab opens the sheet on itself; the tab that is already open folds it
+  /// away again, the way a Maps card closes when you pick the same place.
+  void _selectTab(_StudioTab tab) => setState(() {
+    if (_expanded && tab == _tab) {
+      _expanded = false;
+    } else {
+      _tab = tab;
+      _expanded = true;
+    }
+  });
 
   void _notice(String message) {
     if (!mounted) return;
@@ -258,7 +278,6 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final media = MediaQuery.of(context);
     return PopScope(
       canPop: _leaving || (!_dirty && !_preview && _busy == null),
@@ -303,6 +322,16 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
                   ),
                 ),
               ),
+              // Touching the picture folds the open sheet, so a look at the
+              // whole world is one tap away. Below the chrome and the sheet,
+              // which keep their own taps.
+              if (_expanded && _image != null && !_preview)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _setExpanded(false),
+                  ),
+                ),
               if (_error != null)
                 Center(
                   child: Padding(
@@ -374,89 +403,80 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
                     child: _PreviewFurniture(home: _homePreview),
                   ),
                 ),
-              Align(
-                alignment: Alignment.topCenter,
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: Row(
-                      children: [
-                        ChromeIconButton(
-                          icon: Icons.arrow_back_rounded,
-                          tooltip: 'Back',
-                          onTap: _leave,
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: TitlePill(text: 'Worlds'),
+              // Over the scene, not the app's background: the pills take
+              // light content wherever their glass turns dark with it.
+              ChromeOverImage(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Row(
+                        children: [
+                          ChromeIconButton(
+                            icon: Icons.arrow_back_rounded,
+                            tooltip: 'Back',
+                            onTap: _leave,
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              // Without this the Align takes every pixel of
+                              // height the outer Align offers — the whole screen
+                              // — and the Row grows with it, centring Back, Undo
+                              // and Save halfway down, behind the editor panel.
+                              heightFactor: 1,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: TitlePill(text: 'Worlds'),
+                              ),
                             ),
                           ),
-                        ),
-                        if (_image != null && !_preview) ...[
-                          ChromeIconButton(
-                            icon: Icons.undo_rounded,
-                            tooltip: 'Undo',
-                            onTap: () {
-                              if (_undo.isNotEmpty && _busy == null) {
-                                setState(
-                                  () => _world = _world.copyWith(
-                                    settings: _undo.removeLast(),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          ChromeIconButton(
-                            icon: _service.contains(_world.id) && !_dirty
-                                ? Icons.bookmark_rounded
-                                : Icons.bookmark_border_rounded,
-                            tooltip: 'Save world',
-                            onTap: () {
-                              if (_busy == null) _save();
-                            },
-                          ),
+                          if (_image != null && !_preview) ...[
+                            ChromeIconButton(
+                              icon: Icons.undo_rounded,
+                              tooltip: 'Undo',
+                              onTap: () {
+                                if (_undo.isNotEmpty && _busy == null) {
+                                  setState(
+                                    () => _world = _world.copyWith(
+                                      settings: _undo.removeLast(),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            ChromeIconButton(
+                              icon: _service.contains(_world.id) && !_dirty
+                                  ? Icons.bookmark_rounded
+                                  : Icons.bookmark_border_rounded,
+                              tooltip: 'Save world',
+                              onTap: () {
+                                if (_busy == null) _save();
+                              },
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-              if (_image != null)
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: bounds.maxHeight * (_preview ? .48 : .55),
-                    ),
-                    child: _preview
-                        ? _previewControls()
-                        : Container(
-                            decoration: BoxDecoration(
-                              color: scheme.surface,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(28),
-                              ),
-                            ),
-                            child: SafeArea(
-                              top: false,
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.fromLTRB(
-                                  22,
-                                  14,
-                                  22,
-                                  14,
-                                ),
-                                child: _editorControls(),
-                              ),
-                            ),
-                          ),
-                  ),
+              if (_image != null && _preview)
+                ChromeSheet(
+                  key: const ValueKey('preview'),
+                  header: Builder(builder: _previewHeader),
+                )
+              else if (_image != null)
+                ChromeSheet(
+                  key: const ValueKey('editor'),
+                  header: Builder(builder: _editorHeader),
+                  body: Builder(builder: _editorBody),
+                  expanded: _expanded,
+                  onExpandedChanged: _setExpanded,
                 ),
               if (_busy != null)
                 Positioned.fill(
@@ -506,295 +526,318 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
     );
   }
 
-  Widget _editorControls() => Column(
+  /// Always on show, folded or open: the tabs, then the one action that
+  /// finishes the job. The sheet draws its own handle above this.
+  Widget _editorHeader(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Row(
-        children: [
-          const Expanded(
-            child: Text(
-              'Make it yours',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -.5,
-              ),
-            ),
-          ),
-          TextButton.icon(
-            onPressed: () => _change(
-              _world.isAsset
-                  ? const WorldSettings()
-                  : const WorldSettings(palette: WorldPalette.original),
-            ),
-            icon: const Icon(Icons.restart_alt_rounded, size: 17),
-            label: const Text('Reset'),
-          ),
-        ],
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(
+          children: [
+            for (final tab in _StudioTab.values)
+              Expanded(child: _tabButton(context, tab)),
+          ],
+        ),
       ),
-      Row(
-        children: [
-          for (final tab in _StudioTab.values)
-            Expanded(
-              child: Semantics(
-                selected: tab == _tab,
-                child: InkWell(
-                  onTap: () => setState(() => _tab = tab),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          width: 2,
-                          color: tab == _tab
-                              ? kAccentLight
-                              : Colors.transparent,
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          switch (tab) {
-                            _StudioTab.scene => Icons.crop_rounded,
-                            _StudioTab.atmosphere => Icons.cloud_outlined,
-                            _StudioTab.light => Icons.wb_twilight_rounded,
-                            _StudioTab.motion => Icons.air_rounded,
-                          },
-                          size: 20,
-                          color: tab == _tab
-                              ? kAccentLight
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          switch (tab) {
-                            _StudioTab.scene => 'Scene',
-                            _StudioTab.atmosphere => 'Atmosphere',
-                            _StudioTab.light => 'Light',
-                            _StudioTab.motion => 'Motion',
-                          },
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: tab == _tab
-                                ? kAccentLight
-                                : Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+        child: SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: kAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
             ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      AnimatedSize(
-        duration: const Duration(milliseconds: 180),
-        alignment: Alignment.topCenter,
-        child: switch (_tab) {
-          _StudioTab.scene => Column(
-            children: [
-              _slider(
-                'Zoom',
-                _settings.zoom,
-                1.04,
-                1.6,
-                '${_settings.zoom.toStringAsFixed(2)}×',
-                (v) => _settings.copyWith(zoom: v),
-              ),
-              _slider(
-                'Horizontal position',
-                _settings.focalX,
-                0,
-                1,
-                '${(_settings.focalX * 100).round()}%',
-                (v) => _settings.copyWith(focalX: v),
-              ),
-              _slider(
-                'Vertical position',
-                _settings.focalY,
-                0,
-                1,
-                '${(_settings.focalY * 100).round()}%',
-                (v) => _settings.copyWith(focalY: v),
-              ),
-            ],
+            onPressed: () => setState(() => _preview = true),
+            icon: const Icon(Icons.crop_free_rounded, size: 19),
+            label: const Text('Preview wallpaper'),
           ),
-          _StudioTab.atmosphere => Column(
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final weather in WorldWeather.values)
-                    _choice(
-                      label: switch (weather) {
-                        WorldWeather.clear => 'Clear',
-                        WorldWeather.rain => 'Rain',
-                        WorldWeather.fog => 'Fog',
-                        WorldWeather.clouds => 'Clouds',
-                        WorldWeather.snow => 'Snow',
-                      },
-                      icon: switch (weather) {
-                        WorldWeather.clear => Icons.nightlight_outlined,
-                        WorldWeather.rain => Icons.water_drop_outlined,
-                        WorldWeather.fog => Icons.blur_on_rounded,
-                        WorldWeather.clouds => Icons.cloud_outlined,
-                        WorldWeather.snow => Icons.ac_unit_rounded,
-                      },
-                      selected: weather == _settings.weather,
-                      onTap: () =>
-                          _change(_settings.copyWith(weather: weather)),
-                    ),
-                ],
-              ),
-              if (_settings.weather == WorldWeather.rain ||
-                  _settings.weather == WorldWeather.snow) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final view in WorldWeatherView.values)
-                      _choice(
-                        label: view == WorldWeatherView.openAir
-                            ? 'Open air'
-                            : 'Through glass',
-                        icon: view == WorldWeatherView.openAir
-                            ? Icons.air_rounded
-                            : Icons.window_outlined,
-                        selected: view == _settings.weatherView,
-                        onTap: () =>
-                            _change(_settings.copyWith(weatherView: view)),
-                      ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 10),
-              _slider(
-                switch (_settings.weather) {
-                  WorldWeather.fog => 'Mist density',
-                  WorldWeather.clouds => 'Cloud cover',
-                  WorldWeather.snow => 'Snowfall',
-                  WorldWeather.clear || WorldWeather.rain => 'Rainfall',
-                },
-                _settings.intensity,
-                0,
-                1,
-                '${(_settings.intensity * 100).round()}%',
-                (v) => _settings.copyWith(intensity: v),
-                enabled: _settings.weather != WorldWeather.clear,
-              ),
-            ],
-          ),
-          _StudioTab.light => Column(
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final palette in WorldPalette.values)
-                    _choice(
-                      label: switch (palette) {
-                        WorldPalette.original => 'Original',
-                        WorldPalette.blue => 'Blue hour',
-                        WorldPalette.lavender => 'Lavender',
-                        WorldPalette.amber => 'Amber',
-                      },
-                      selected: palette == _settings.palette,
-                      onTap: () =>
-                          _change(_settings.copyWith(palette: palette)),
-                      swatch: switch (palette) {
-                        WorldPalette.original => const Color(0xFFB2B5C0),
-                        WorldPalette.blue => const Color(0xFF637FC5),
-                        WorldPalette.lavender => const Color(0xFFB29BE7),
-                        WorldPalette.amber => const Color(0xFFD6A674),
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _slider(
-                'Brightness',
-                _settings.glow,
-                0,
-                1,
-                '${(_settings.glow * 100).round()}%',
-                (v) => _settings.copyWith(glow: v),
-              ),
-            ],
-          ),
-          _StudioTab.motion => Column(
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text('Living scene', style: TextStyle(fontSize: 14)),
-                  ),
-                  Switch.adaptive(
-                    value: _settings.motion,
-                    onChanged: (v) => _change(_settings.copyWith(motion: v)),
-                  ),
-                ],
-              ),
-              if (MediaQuery.disableAnimationsOf(context))
-                const Text(
-                  'Motion is paused by your device’s Reduce Motion setting.',
-                  style: TextStyle(fontSize: 12),
-                ),
-              _slider(
-                'Speed',
-                _settings.speed,
-                0,
-                1,
-                _settings.speed < .45
-                    ? 'Slow'
-                    : _settings.speed < .75
-                    ? 'Steady'
-                    : 'Fast',
-                (v) => _settings.copyWith(speed: v),
-                enabled: _settings.motion,
-              ),
-              _slider(
-                'Camera drift',
-                _settings.drift,
-                0,
-                1,
-                '${(_settings.drift * 100).round()}%',
-                (v) => _settings.copyWith(drift: v),
-                enabled: _settings.motion,
-              ),
-            ],
-          ),
-        },
-      ),
-      const SizedBox(height: 12),
-      SizedBox(
-        width: double.infinity,
-        height: 50,
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: kAccent,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          onPressed: () => setState(() => _preview = true),
-          icon: const Icon(Icons.crop_free_rounded, size: 19),
-          label: const Text('Preview wallpaper'),
         ),
       ),
     ],
   );
 
+  /// The open tab's controls, revealed when the sheet is pulled up.
+  Widget _editorBody(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Reset sits with the controls it resets; folded away, there is
+        // nothing on show for it to reset.
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const Size(0, 28),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              textStyle: const TextStyle(fontSize: 12.5),
+            ),
+            onPressed: () => _change(
+              _world.isAsset
+                  ? const WorldSettings()
+                  : const WorldSettings(palette: WorldPalette.original),
+            ),
+            icon: const Icon(Icons.restart_alt_rounded, size: 16),
+            label: const Text('Reset'),
+          ),
+        ),
+        _tabControls(context),
+      ],
+    ),
+  );
+
+  /// One tab. Nothing reads as selected while the sheet is folded — there
+  /// are no controls on show for it to be selected into.
+  Widget _tabButton(BuildContext context, _StudioTab tab) {
+    final theme = Theme.of(context);
+    final active = _expanded && tab == _tab;
+    // kAccentLight is the accent for dark surfaces. On the light theme's pale
+    // capsule it falls under 3:1, so the label takes the deeper accent there.
+    final accent = theme.brightness == Brightness.dark ? kAccentLight : kAccent;
+    final color = active ? accent : theme.colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Semantics(
+        button: true,
+        selected: active,
+        child: InkWell(
+          onTap: () => _selectTab(tab),
+          borderRadius: BorderRadius.circular(14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            decoration: BoxDecoration(
+              color: active
+                  ? kAccent.withValues(alpha: .16)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  switch (tab) {
+                    _StudioTab.scene => Icons.crop_rounded,
+                    _StudioTab.atmosphere => Icons.cloud_outlined,
+                    _StudioTab.light => Icons.wb_twilight_rounded,
+                    _StudioTab.motion => Icons.air_rounded,
+                  },
+                  size: 19,
+                  color: color,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  switch (tab) {
+                    _StudioTab.scene => 'Scene',
+                    _StudioTab.atmosphere => 'Atmosphere',
+                    _StudioTab.light => 'Light',
+                    _StudioTab.motion => 'Motion',
+                  },
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tabControls(BuildContext context) => switch (_tab) {
+    _StudioTab.scene => Column(
+      children: [
+        _slider(
+          context,
+          'Zoom',
+          _settings.zoom,
+          1.04,
+          1.6,
+          '${_settings.zoom.toStringAsFixed(2)}×',
+          (v) => _settings.copyWith(zoom: v),
+        ),
+        _slider(
+          context,
+          'Horizontal',
+          _settings.focalX,
+          0,
+          1,
+          '${(_settings.focalX * 100).round()}%',
+          (v) => _settings.copyWith(focalX: v),
+        ),
+        _slider(
+          context,
+          'Vertical',
+          _settings.focalY,
+          0,
+          1,
+          '${(_settings.focalY * 100).round()}%',
+          (v) => _settings.copyWith(focalY: v),
+        ),
+      ],
+    ),
+    _StudioTab.atmosphere => Column(
+      children: [
+        _choiceRow([
+          for (final weather in WorldWeather.values)
+            _choice(
+              context,
+              label: switch (weather) {
+                WorldWeather.clear => 'Clear',
+                WorldWeather.rain => 'Rain',
+                WorldWeather.fog => 'Fog',
+                WorldWeather.clouds => 'Clouds',
+                WorldWeather.snow => 'Snow',
+              },
+              icon: switch (weather) {
+                WorldWeather.clear => Icons.nightlight_outlined,
+                WorldWeather.rain => Icons.water_drop_outlined,
+                WorldWeather.fog => Icons.blur_on_rounded,
+                WorldWeather.clouds => Icons.cloud_outlined,
+                WorldWeather.snow => Icons.ac_unit_rounded,
+              },
+              selected: weather == _settings.weather,
+              onTap: () => _change(_settings.copyWith(weather: weather)),
+            ),
+        ]),
+        if (_settings.weather == WorldWeather.rain ||
+            _settings.weather == WorldWeather.snow) ...[
+          const SizedBox(height: 8),
+          _choiceRow([
+            for (final view in WorldWeatherView.values)
+              _choice(
+                context,
+                label: view == WorldWeatherView.openAir
+                    ? 'Open air'
+                    : 'Through glass',
+                icon: view == WorldWeatherView.openAir
+                    ? Icons.air_rounded
+                    : Icons.window_outlined,
+                selected: view == _settings.weatherView,
+                onTap: () => _change(_settings.copyWith(weatherView: view)),
+              ),
+          ]),
+        ],
+        const SizedBox(height: 6),
+        _slider(
+          context,
+          switch (_settings.weather) {
+            WorldWeather.fog => 'Mist density',
+            WorldWeather.clouds => 'Cloud cover',
+            WorldWeather.snow => 'Snowfall',
+            WorldWeather.clear || WorldWeather.rain => 'Rainfall',
+          },
+          _settings.intensity,
+          0,
+          1,
+          '${(_settings.intensity * 100).round()}%',
+          (v) => _settings.copyWith(intensity: v),
+          enabled: _settings.weather != WorldWeather.clear,
+        ),
+      ],
+    ),
+    _StudioTab.light => Column(
+      children: [
+        _choiceRow([
+          for (final palette in WorldPalette.values)
+            _choice(
+              context,
+              label: switch (palette) {
+                WorldPalette.original => 'Original',
+                WorldPalette.blue => 'Blue hour',
+                WorldPalette.lavender => 'Lavender',
+                WorldPalette.amber => 'Amber',
+              },
+              selected: palette == _settings.palette,
+              onTap: () => _change(_settings.copyWith(palette: palette)),
+              swatch: switch (palette) {
+                WorldPalette.original => const Color(0xFFB2B5C0),
+                WorldPalette.blue => const Color(0xFF637FC5),
+                WorldPalette.lavender => const Color(0xFFB29BE7),
+                WorldPalette.amber => const Color(0xFFD6A674),
+              },
+            ),
+        ]),
+        const SizedBox(height: 6),
+        _slider(
+          context,
+          'Brightness',
+          _settings.glow,
+          0,
+          1,
+          '${(_settings.glow * 100).round()}%',
+          (v) => _settings.copyWith(glow: v),
+        ),
+      ],
+    ),
+    _StudioTab.motion => Column(
+      children: [
+        SizedBox(
+          height: 40,
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text('Living scene', style: TextStyle(fontSize: 13)),
+              ),
+              Switch.adaptive(
+                value: _settings.motion,
+                onChanged: (v) => _change(_settings.copyWith(motion: v)),
+              ),
+            ],
+          ),
+        ),
+        if (MediaQuery.disableAnimationsOf(context))
+          const Padding(
+            padding: EdgeInsets.only(bottom: 4),
+            child: Text(
+              'Motion is paused by your device’s Reduce Motion setting.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        _slider(
+          context,
+          'Speed',
+          _settings.speed,
+          0,
+          1,
+          _settings.speed < .45
+              ? 'Slow'
+              : _settings.speed < .75
+              ? 'Steady'
+              : 'Fast',
+          (v) => _settings.copyWith(speed: v),
+          enabled: _settings.motion,
+        ),
+        _slider(
+          context,
+          'Camera drift',
+          _settings.drift,
+          0,
+          1,
+          '${(_settings.drift * 100).round()}%',
+          (v) => _settings.copyWith(drift: v),
+          enabled: _settings.motion,
+        ),
+      ],
+    ),
+  };
+
+  /// Label, track and value on one line — half the height of a label row
+  /// stacked over its slider, which is most of what made the sheet tall.
   Widget _slider(
+    BuildContext context,
     String label,
     double value,
     double min,
@@ -804,47 +847,71 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
     bool enabled = true,
   }) => Opacity(
     opacity: enabled ? 1 : .4,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
-            Text(
+    child: SizedBox(
+      height: 36,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              ),
+              child: Slider(
+                value: value,
+                min: min,
+                max: max,
+                activeColor: kAccentLight,
+                semanticFormatterCallback: (_) => display,
+                onChangeStart: enabled ? (_) => _remember() : null,
+                onChanged: enabled
+                    ? (v) => _change(change(v), remember: false)
+                    : null,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 46,
+            child: Text(
               display,
+              textAlign: TextAlign.end,
               style: const TextStyle(
                 fontSize: 12,
                 fontFeatures: [ui.FontFeature.tabularFigures()],
               ),
             ),
-          ],
-        ),
-        SizedBox(
-          height: 32,
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 2,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-            ),
-            child: Slider(
-              value: value,
-              min: min,
-              max: max,
-              activeColor: kAccentLight,
-              semanticFormatterCallback: (_) => display,
-              onChangeStart: enabled ? (_) => _remember() : null,
-              onChanged: enabled
-                  ? (v) => _change(change(v), remember: false)
-                  : null,
-            ),
           ),
-        ),
+        ],
+      ),
+    ),
+  );
+
+  /// One line of choices. It scrolls sideways rather than wrapping, so a
+  /// long set never adds a second row of sheet over the picture.
+  Widget _choiceRow(List<Widget> choices) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        for (final (i, choice) in choices.indexed) ...[
+          if (i > 0) const SizedBox(width: 6),
+          choice,
+        ],
       ],
     ),
   );
 
-  Widget _choice({
+  Widget _choice(
+    BuildContext context, {
     required String label,
     required bool selected,
     required VoidCallback onTap,
@@ -864,40 +931,49 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
               ? kAccentLight
               : Theme.of(context).colorScheme.outlineVariant,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 13),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(0, 34),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
+          if (icon != null) ...[Icon(icon, size: 15), const SizedBox(width: 5)],
           if (swatch != null) ...[
             Container(
-              width: 13,
-              height: 13,
+              width: 12,
+              height: 12,
               decoration: BoxDecoration(color: swatch, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
           ],
-          Flexible(child: Text(label, style: const TextStyle(fontSize: 12))),
+          Text(label, style: const TextStyle(fontSize: 12)),
         ],
       ),
     ),
   );
 
-  Widget _previewControls() => SafeArea(
-    top: false,
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(22, 12, 22, 16),
+  /// Everything the preview needs, in one folded sheet: which screen to see
+  /// it on, then the single decision — keep this world — with the lesser
+  /// ways out beneath it. As little as possible over the picture being judged.
+  Widget _previewHeader(BuildContext context) {
+    final secondary = TextButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      textStyle: const TextStyle(fontSize: 12.5),
+    );
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: const Color(0xE51B1C2A),
-              borderRadius: BorderRadius.circular(30),
+              color: scheme.onSurface.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(22),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -906,10 +982,11 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
                   TextButton(
                     style: TextButton.styleFrom(
                       backgroundColor: _homePreview == home
-                          ? const Color(0xFF3A364C)
+                          ? kAccent.withValues(alpha: .18)
                           : Colors.transparent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      foregroundColor: scheme.onSurface,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
                     ),
                     onPressed: () => setState(() => _homePreview = home),
                     child: Text(
@@ -920,91 +997,85 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(22),
+          const SizedBox(height: 10),
+          Text(
+            _service.supportsLiveWallpaper
+                ? 'Confirm in your device’s wallpaper preview.'
+                : _service.supportsLivePhoto
+                ? 'Saves a Live Photo. In Photos, choose it as your Lock Screen — it moves when you wake your iPhone.'
+                : 'Save a still image, then set it as wallpaper in Photos.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.35,
+              color: scheme.onSurfaceVariant,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _service.supportsLiveWallpaper
-                      ? 'Confirm in your device’s wallpaper preview.'
-                      : _service.supportsLivePhoto
-                      ? 'Saves a Live Photo. In Photos, choose it as your Lock Screen — it moves when you wake your iPhone.'
-                      : 'Save a still image, then set it as wallpaper in Photos.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: kAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: kAccent,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: _service.supportsLiveWallpaper
-                        ? _apply
-                        : _service.supportsLivePhoto
-                        ? _saveLive
-                        : () => _export(),
-                    icon: Icon(
-                      _service.supportsLiveWallpaper
-                          ? Icons.wallpaper_rounded
-                          : _service.supportsLivePhoto
-                          ? Icons.motion_photos_on_rounded
-                          : Icons.save_alt_rounded,
-                      size: 18,
-                    ),
-                    label: Text(
-                      _service.supportsLiveWallpaper
-                          ? 'Set live wallpaper'
-                          : _service.supportsLivePhoto
-                          ? 'Save Live Photo'
-                          : 'Save to Photos',
-                    ),
-                  ),
-                ),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 4,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => setState(() => _preview = false),
-                      icon: const Icon(Icons.tune_rounded, size: 16),
-                      label: const Text('Edit'),
-                    ),
-                    // Where the primary control saves motion, a still is
-                    // still worth offering — for the Home Screen, say.
-                    if (_service.supportsLiveWallpaper ||
-                        _service.supportsLivePhoto)
-                      TextButton.icon(
-                        onPressed: () => _export(),
-                        icon: const Icon(Icons.download_rounded, size: 16),
-                        label: const Text('Save image'),
-                      ),
-                    TextButton.icon(
-                      onPressed: () => _export(share: true),
-                      icon: const Icon(Icons.ios_share_rounded, size: 16),
-                      label: const Text('Share image'),
-                    ),
-                  ],
-                ),
-              ],
+              ),
+              onPressed: _service.supportsLiveWallpaper
+                  ? _apply
+                  : _service.supportsLivePhoto
+                  ? _saveLive
+                  : () => _export(),
+              icon: Icon(
+                _service.supportsLiveWallpaper
+                    ? Icons.wallpaper_rounded
+                    : _service.supportsLivePhoto
+                    ? Icons.motion_photos_on_rounded
+                    : Icons.save_alt_rounded,
+                size: 18,
+              ),
+              label: Text(
+                _service.supportsLiveWallpaper
+                    ? 'Set live wallpaper'
+                    : _service.supportsLivePhoto
+                    ? 'Save Live Photo'
+                    : 'Save to Photos',
+              ),
             ),
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 2,
+            children: [
+              TextButton.icon(
+                style: secondary,
+                onPressed: () => setState(() => _preview = false),
+                icon: const Icon(Icons.tune_rounded, size: 16),
+                label: const Text('Edit'),
+              ),
+              // Where the primary control saves motion, a still is still
+              // worth offering — for the Home Screen, say.
+              if (_service.supportsLiveWallpaper || _service.supportsLivePhoto)
+                TextButton.icon(
+                  style: secondary,
+                  onPressed: () => _export(),
+                  icon: const Icon(Icons.download_rounded, size: 16),
+                  label: const Text('Save image'),
+                ),
+              TextButton.icon(
+                style: secondary,
+                onPressed: () => _export(share: true),
+                icon: const Icon(Icons.ios_share_rounded, size: 16),
+                label: const Text('Share image'),
+              ),
+            ],
           ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _NameDialog extends StatefulWidget {

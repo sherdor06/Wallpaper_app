@@ -143,6 +143,10 @@ void main() {
         await tester.pump();
       }
       expect(find.byType(WorldScene), findsOneWidget);
+      // The editor opens folded, over the whole world; its controls come out
+      // with a tab.
+      await tester.tap(find.text('Atmosphere'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Through glass'));
       await tester.tap(find.text('Through glass'));
       await tester.pumpAndSettle();

@@ -6,7 +6,6 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../accent.dart';
 
-
 /// True on iOS 26+, where the native Liquid Glass controls (tab bar, popup
 /// menus) are available. [Platform.operatingSystemVersion] is a free-form
 /// string, so parse defensively.
@@ -100,7 +99,10 @@ class ChromeIconButton extends StatelessWidget {
     Widget button;
     if (!Platform.isAndroid) {
       button = GlassIconButton(
-        icon: Icon(icon),
+        // An explicit colour: left alone, the package reaches for
+        // CupertinoColors.label without resolving it, which is black in
+        // either theme — dark glyphs on dark glass over a dark picture.
+        icon: Icon(icon, color: Theme.of(context).colorScheme.onSurface),
         onPressed: onTap,
         size: size,
         iconSize: glyph,
@@ -431,6 +433,221 @@ class ChromePillButton extends StatelessWidget {
       height: kTopBarHeight,
       shape: const LiquidRoundedSuperellipse(borderRadius: kTopBarHeight / 2),
       child: content,
+    );
+  }
+}
+
+/// Chrome that floats over a picture rather than over the app's own
+/// background — the World studio, whose scene is dark in every world.
+///
+/// On iOS the glass takes on the darkness behind it, so what sits on it has
+/// to be light whatever the app theme says; a light-theme pill would put dark
+/// text on dark glass. Android's solid pills carry their own background and
+/// are left alone.
+class ChromeOverImage extends StatelessWidget {
+  final Widget child;
+
+  const ChromeOverImage({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) =>
+      Platform.isAndroid ? child : _overDarkImage(child);
+}
+
+/// The app's dark theme, for content on glass over a dark picture. Built
+/// once: seeding a colour scheme is not free, and this sits in build paths.
+final ThemeData _darkOverImageTheme = ThemeData(
+  useMaterial3: true,
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: kAccent,
+    brightness: Brightness.dark,
+  ),
+);
+
+/// Light content and dark glass for [child], the way iOS draws controls over
+/// dark imagery.
+Widget _overDarkImage(Widget child) => Theme(
+  data: _darkOverImageTheme,
+  child: GlassTheme(
+    data: const GlassThemeData(brightness: Brightness.dark),
+    child: child,
+  ),
+);
+
+/// A sheet rising from the bottom edge over full-bleed content — the World
+/// studio's editor and its wallpaper preview. Folded, it shows [header];
+/// open, [body] as well, underneath it.
+///
+/// Place it directly in a full-screen [Stack]; it positions itself against
+/// the bottom edge.
+///
+/// iOS draws the Maps card: clear liquid glass lifted off the screen edges,
+/// with the same inset and corners at every height, so the picture keeps
+/// moving underneath and around it. Android gets the Material bottom sheet,
+/// solid and edge to edge — the glass pipeline is skipped there entirely
+/// (see the `builder` in main.dart).
+///
+/// Height follows the content: it animates between folded and open and
+/// across tabs of different length, and never jumps to a fixed detent.
+class ChromeSheet extends StatefulWidget {
+  final Widget header;
+  final Widget? body;
+  final bool expanded;
+  final ValueChanged<bool>? onExpandedChanged;
+
+  const ChromeSheet({
+    super.key,
+    required this.header,
+    this.body,
+    this.expanded = false,
+    this.onExpandedChanged,
+  });
+
+  @override
+  State<ChromeSheet> createState() => _ChromeSheetState();
+}
+
+class _ChromeSheetState extends State<ChromeSheet> {
+  /// Gap between the iOS card and the screen edges, as in Maps.
+  static const double _margin = 10;
+
+  /// Concentric with the display's own corners once inset by [_margin].
+  static const double _radius = 44;
+
+  double _dragDy = 0;
+
+  bool get _toggles => widget.body != null && widget.onExpandedChanged != null;
+
+  /// A flick decides by direction; a slow drag has to travel far enough that
+  /// a tap wobbling on a tab does not count.
+  void _endDrag(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final flick = velocity.abs() > 200;
+    if (flick || _dragDy.abs() > 24) {
+      final open = flick ? velocity < 0 : _dragDy < 0;
+      if (open != widget.expanded) widget.onExpandedChanged!(open);
+    }
+    _dragDy = 0;
+  }
+
+  /// The grabber and the header are the grip: drag up to open, down to fold.
+  /// The body keeps its own gestures — a slider or a sideways chip row would
+  /// fight a vertical drag.
+  Widget _grip(Widget child) => GestureDetector(
+    behavior: HitTestBehavior.translucent,
+    onVerticalDragStart: _toggles ? (_) => _dragDy = 0 : null,
+    onVerticalDragUpdate: _toggles ? (d) => _dragDy += d.delta.dy : null,
+    onVerticalDragEnd: _toggles ? _endDrag : null,
+    child: child,
+  );
+
+  Widget _content(BuildContext context, {required double bottomPad}) {
+    final scheme = Theme.of(context).colorScheme;
+    final media = MediaQuery.of(context);
+    return Material(
+      // Ink draws on the sheet, not on the page beneath it where the
+      // surface would hide it.
+      type: MaterialType.transparency,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomPad),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_toggles)
+              _grip(
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => widget.onExpandedChanged!(!widget.expanded),
+                  child: SizedBox(
+                    height: 22,
+                    width: double.infinity,
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: scheme.onSurfaceVariant.withValues(alpha: .45),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              // Nothing to drag: a grabber here would promise a gesture.
+              const SizedBox(height: 16),
+            _grip(widget.header),
+            if (widget.body != null)
+              AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: widget.expanded
+                    ? ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: media.size.height * .4,
+                        ),
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: widget.body,
+                        ),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+
+    if (Platform.isAndroid) {
+      return Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: _content(context, bottomPad: safeBottom + 8),
+        ),
+      );
+    }
+    return Positioned(
+      left: _margin,
+      right: _margin,
+      bottom: _margin,
+      child: _overDarkImage(
+        Builder(
+          builder: (context) => GlassContainer(
+            // Its own layer: per-widget settings only take effect there, and a
+            // card this size must not melt into the chrome pills above it.
+            useOwnLayer: true,
+            shape: const LiquidRoundedSuperellipse(borderRadius: _radius),
+            settings: const LiquidGlassSettings(
+              // Clear glass, as in Maps: a light dark tint and a heavy blur,
+              // so the world shows through as colour and light rather than
+              // as a grey slab. The saturation lift is iOS's vibrancy.
+              glassColor: Color(0x2E000000),
+              blur: 20,
+              thickness: 28,
+              saturation: 1.8,
+            ),
+            child: _content(
+              context,
+              // The home indicator overlaps the card's lower edge; the content
+              // steps clear of it instead of the whole card rising higher.
+              bottomPad: math.max(12.0, safeBottom - _margin),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
