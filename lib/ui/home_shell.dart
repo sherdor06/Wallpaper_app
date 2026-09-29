@@ -215,14 +215,16 @@ class _HomeShellState extends State<HomeShell> {
             onTap: _select,
             tint: kAccent,
             // The last item rides alone on the right: a round glass pill
-            // for Search, the shape Apple gives it.
+            // for Search, the shape Apple gives it — glyph only, no label,
+            // the way the system's own search pill is drawn. An empty
+            // label reaches UIKit as a nil title, which centres the glyph.
             split: true,
             rightCount: 1,
             items: const [
               CNTabBarItem(label: 'Home', icon: CNSymbol('house.fill')),
               CNTabBarItem(label: 'Favorites', icon: CNSymbol('heart.fill')),
               CNTabBarItem(label: 'Settings', icon: CNSymbol('gearshape.fill')),
-              CNTabBarItem(label: 'Search', icon: CNSymbol('magnifyingglass')),
+              CNTabBarItem(icon: CNSymbol('magnifyingglass')),
             ],
           ),
         ),
