@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 
 import '../../data/wallpaper_repository.dart';
@@ -43,7 +45,7 @@ class _SearchPageState extends State<SearchPage> {
   /// A chip, a recent, or the keyboard's search key: worth remembering.
   void _commit(String q) {
     _set(q);
-    SearchService.instance.remember(q);
+    unawaited(SearchService.instance.remember(q));
   }
 
   @override

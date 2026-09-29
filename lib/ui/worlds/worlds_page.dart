@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -505,13 +507,13 @@ class _SavedWorldCardState extends State<_SavedWorldCard> {
   @override
   void initState() {
     super.initState();
-    _load();
+    unawaited(_load());
   }
 
   @override
   void didUpdateWidget(_SavedWorldCard old) {
     super.didUpdateWidget(old);
-    if (old.world.imagePath != widget.world.imagePath) _load();
+    if (old.world.imagePath != widget.world.imagePath) unawaited(_load());
   }
 
   Future<void> _load() async {

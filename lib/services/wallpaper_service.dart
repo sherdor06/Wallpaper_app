@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -26,7 +28,15 @@ class WallpaperService {
   static final WallpaperService instance = WallpaperService._();
 
   static const MethodChannel _channel = MethodChannel('wallpaper.channel/setter');
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      // receiveTimeout is the longest silence between chunks, not a cap on the
+      // whole transfer: a slow 4K download still finishes, a dead one fails
+      // instead of leaving the button on "Downloading…" for good.
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 30),
+    ),
+  );
 
   /// Downloads [url] to a temporary file. [onProgress] reports a 0.0..1.0 value.
   Future<String> _download(String url, {void Function(double)? onProgress}) async {
@@ -69,7 +79,7 @@ class WallpaperService {
         'screen': target.value,
       });
     } finally {
-      _deleteQuietly(path); // don't let temp downloads pile up
+      unawaited(_deleteQuietly(path)); // don't let temp downloads pile up
     }
   }
 
@@ -83,7 +93,7 @@ class WallpaperService {
     try {
       await _channel.invokeMethod<bool>('saveImageToGallery', {'path': path});
     } finally {
-      _deleteQuietly(path);
+      unawaited(_deleteQuietly(path));
     }
   }
 

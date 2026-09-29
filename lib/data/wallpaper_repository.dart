@@ -68,7 +68,15 @@ class WallpaperRepository {
   static const _bundledAsset = 'assets/catalog.sample.json';
   static const _cacheFileName = 'catalog_cache.json';
 
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      // Without these a stalled connection holds the gallery on its loader
+      // for as long as the OS takes to give up — over a minute — while a
+      // perfectly good copy sits in the disk cache.
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 20),
+    ),
+  );
   Catalog? _cache;
 
   /// Returns the catalog. When [forceRefresh] is `true`, the cache is bypassed
@@ -76,7 +84,11 @@ class WallpaperRepository {
   Future<Catalog> fetchCatalog({bool forceRefresh = false}) async {
     if (_cache != null && !forceRefresh) return _cache!;
 
-    String? raw;
+    // Each source counts only if it parses. A captive-portal login page, or
+    // an error page served with a 200, is not a catalog — cached, it would
+    // leave the app empty on every later offline start. So the network copy
+    // is parsed first and written to disk only once it has.
+    Catalog? catalog;
     if (AppConfig.hasRemoteCatalog) {
       try {
         // On pull-to-refresh, bust the CDN cache so deletions/additions appear
@@ -88,23 +100,34 @@ class WallpaperRepository {
           url,
           options: Options(responseType: ResponseType.plain),
         );
-        raw = res.data;
+        final raw = res.data;
         if (raw != null && raw.isNotEmpty) {
+          catalog = _parse(raw);
           await _saveToDisk(raw); // so it works offline next time
         }
       } catch (_) {
-        raw = await _readFromDisk(); // no network -> last cached copy
+        // No network, or a body that is not a catalog: the disk copy follows.
       }
-    } else {
-      raw = await _readFromDisk();
     }
+    catalog ??= await _parseFromDisk();
 
     // If nothing else worked -> bundled sample (so the app isn't empty).
-    raw ??= await rootBundle.loadString(_bundledAsset);
-
-    final catalog = _parse(raw);
+    catalog ??= _parse(await rootBundle.loadString(_bundledAsset));
     _cache = catalog;
     return catalog;
+  }
+
+  /// The last good catalog on disk, or null when there is none or it no
+  /// longer parses — which a copy saved by an older build, before responses
+  /// were checked, may not.
+  Future<Catalog?> _parseFromDisk() async {
+    final raw = await _readFromDisk();
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return _parse(raw);
+    } catch (_) {
+      return null;
+    }
   }
 
   Catalog _parse(String raw) {

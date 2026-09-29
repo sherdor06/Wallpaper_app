@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
@@ -41,7 +43,7 @@ class _SplashGateState extends State<SplashGate> with TickerProviderStateMixin {
   void _maybeAskConsent() {
     if (!ConsentService.instance.isRequired) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) showConsentDialog(context);
+      if (mounted) unawaited(showConsentDialog(context));
     });
   }
 

@@ -51,6 +51,7 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
 
   BannerAd? _ad;
   Timer? _retryTimer;
+  StreamSubscription<BannerAdLoadState>? _loadStates;
   int _attempts = 0;
   int? _reservedHeight;
   bool _loaded = false;
@@ -72,11 +73,11 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     // Wait until the SDK is up and consent is applied before requesting. A
     // debug run on a simulator answers false here (no ad is requested there
     // at all — see AdService), so the strip collapses.
-    AdService.instance.adsAllowed.then((allowed) {
+    unawaited(AdService.instance.adsAllowed.then((allowed) {
       if (!mounted) return;
       setState(() => _adsPossible = allowed);
       if (allowed) unawaited(_setup());
-    });
+    }));
   }
 
   /// Reserves the banner's height, then kicks off the first load.
@@ -93,9 +94,12 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     } catch (_) {
       // Keep [_fallbackHeight]; a few pixels off beats no banner at all.
     }
+    // The measurement is a platform round trip, long enough to leave the
+    // screen during it. An ad created past this point is never destroyed.
+    if (!mounted) return;
 
     final ad = BannerAd(adSize: size);
-    ad.loadStateStream.listen(_onLoadState);
+    _loadStates = ad.loadStateStream.listen(_onLoadState);
     _ad = ad;
     await _load();
   }
@@ -135,7 +139,9 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
   @override
   void dispose() {
     _retryTimer?.cancel();
-    _ad?.destroy();
+    // Failures here are of no interest once the banner is gone.
+    _loadStates?.cancel().ignore();
+    _ad?.destroy().ignore();
     super.dispose();
   }
 

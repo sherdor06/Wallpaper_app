@@ -193,6 +193,12 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 ## Tekshirish
 
 - `flutter analyze` toza bo'lmaguncha commit yo'q.
+- Future tashlab yuborilmaydi (`unawaited_futures`, `discarded_futures` yoqilgan):
+  ushlanmagan async xato `main.dart` da Crashlytics'ga **fatal** bo'lib ketadi.
+  `unawaited(...)` faqat chaqirilgan funksiya xatoni o'zi ushlashi
+  tekshirilgandan keyin; qiziqmagan natija (`dispose` dagi cancel/destroy) —
+  `.ignore()`. Tarmoq so'rovlarida timeout bo'ladi; tarmoqdan kelgan narsa
+  parse bo'lmaguncha keshga yozilmaydi.
 - UI o'zgarishi → ikkala platformada ko'rish: iOS simulyator (iPhone 17 Pro,
   iOS 26) va Android emulator (`emulator-5554`). Faqat bittasida ko'rib
   "tayyor" deyilmaydi.

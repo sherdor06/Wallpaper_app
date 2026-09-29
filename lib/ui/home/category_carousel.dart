@@ -121,15 +121,18 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
 
   void _start([Duration delay = _advanceEvery]) {
     _timer?.cancel();
+    // A slide can finish after the strip is gone (see whenComplete below).
+    // A timer started then would fire on a dead state, find it unmounted,
+    // start another, and go on doing that for the life of the app.
+    if (!mounted) return;
     _timer = Timer(delay, _advance);
   }
 
   void _advance() {
+    if (!mounted) return;
     // A page under a hidden tab has no ticker: the animation would never
     // finish and the strip would be stuck on the next visit. Try again later.
-    if (!mounted ||
-        !TickerMode.valuesOf(context).enabled ||
-        !_controller.hasClients) {
+    if (!TickerMode.valuesOf(context).enabled || !_controller.hasClients) {
       _start();
       return;
     }
@@ -140,9 +143,11 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
     }
     // Ease in and out: the card drifts off and the next settles, rather
     // than the snap a finger-flick gets.
-    _controller
-        .nextPage(duration: _slide, curve: Curves.easeInOutCubic)
-        .whenComplete(_start);
+    unawaited(
+      _controller
+          .nextPage(duration: _slide, curve: Curves.easeInOutCubic)
+          .whenComplete(_start),
+    );
   }
 
   /// A touch pauses the strip so it never yanks a card out from under a
@@ -367,7 +372,7 @@ class _MarqueeState extends State<_Marquee>
     if (focused == _focused) return;
     _focused = focused;
     if (focused) {
-      _run();
+      unawaited(_run());
     } else {
       // Off focus: straight back to the start. The card is mid-slide at
       // this moment, so the jump hides in the motion; a visible rewind

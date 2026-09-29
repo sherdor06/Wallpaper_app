@@ -33,6 +33,10 @@ class DeepLinkService {
   static const _pathPrefix = '/w/';
 
   final AppLinks _appLinks = AppLinks();
+  // Deliberately never cancelled: links can arrive at any moment the app is
+  // alive, and [init] only ever subscribes once (`??=`), so there is nothing
+  // to leak and no point at which listening should stop.
+  // ignore: cancel_subscriptions
   StreamSubscription<Uri>? _sub;
   GlobalKey<NavigatorState>? _navigator;
 

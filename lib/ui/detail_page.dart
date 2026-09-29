@@ -31,13 +31,13 @@ const _warning = Color(0xFFF0A35E);
 
 /// What the price chip says.
 ///
-/// Deliberately not a duration: the AdMob SDK reports neither the length of a
-/// loaded ad nor the time left in one — `RewardedAd.show` takes only
-/// `onUserEarnedReward` — so any number here would be a guess presented as fact.
+/// Deliberately not a duration: the ad SDK reports neither the length of a
+/// loaded ad nor the time left in one, so any number here would be a guess
+/// presented as fact.
 ///
-/// Singular, and phrased as the action rather than the ad format ("Rewarded
-/// ads" is AdMob's name for the category): this chip is a price on one tap, and
-/// a plural would promise a queue of ads that never comes.
+/// Singular, and phrased as the action rather than the ad format ("rewarded
+/// ads" is the industry's name for the category): this chip is a price on one
+/// tap, and a plural would promise a queue of ads that never comes.
 const _chipIdleLabel = 'Watch ad';
 const _chipPlayingLabel = 'Playing';
 
@@ -166,7 +166,7 @@ class _DetailPageState extends State<DetailPage> {
   void initState() {
     super.initState();
     AnalyticsService.logWallpaperView(_w.id, category: _w.category);
-    _fetchFileSize();
+    unawaited(_fetchFileSize());
   }
 
   @override
@@ -174,7 +174,7 @@ class _DetailPageState extends State<DetailPage> {
     _holdTimer?.cancel();
     _progress.dispose();
     // Restore the system bars when leaving the preview.
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     super.dispose();
   }
 
@@ -207,8 +207,10 @@ class _DetailPageState extends State<DetailPage> {
 
   void _toggleImmersive() {
     setState(() => _immersive = !_immersive);
-    SystemChrome.setEnabledSystemUIMode(
-      _immersive ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+    unawaited(
+      SystemChrome.setEnabledSystemUIMode(
+        _immersive ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+      ),
     );
   }
 
@@ -274,7 +276,7 @@ class _DetailPageState extends State<DetailPage> {
         },
       );
       AnalyticsService.logWallpaperSet(_w.id, target: target.value);
-      HistoryService.instance.add(_w.id);
+      unawaited(HistoryService.instance.add(_w.id));
       // The one moment the app has clearly been useful — which is the only
       // moment worth spending Android's single notification prompt on.
       unawaited(PushService.instance.maybeAskPermission());
@@ -316,7 +318,7 @@ class _DetailPageState extends State<DetailPage> {
         },
       );
       AnalyticsService.logWallpaperDownload(_w.id);
-      HistoryService.instance.add(_w.id);
+      unawaited(HistoryService.instance.add(_w.id));
       await AdService.instance.maybeShowInterstitial();
       _snack('Saved to gallery');
     } catch (_) {
@@ -349,7 +351,7 @@ class _DetailPageState extends State<DetailPage> {
         },
       );
       AnalyticsService.logWallpaperDownload(_w.id);
-      HistoryService.instance.add(_w.id);
+      unawaited(HistoryService.instance.add(_w.id));
       await AdService.instance.maybeShowInterstitial();
       // Success is reported inside the panel, not as a snack.
       _setSaveState(_SaveState.done, revertAfter: _doneHold);
@@ -384,7 +386,7 @@ class _DetailPageState extends State<DetailPage> {
         },
       );
       AnalyticsService.logWallpaperSet(_w.id, target: 'live');
-      HistoryService.instance.add(_w.id);
+      unawaited(HistoryService.instance.add(_w.id));
       // The system live-wallpaper preview opens; the user confirms there.
       _snack('Tap "Set wallpaper" in the preview');
     } on PlatformException catch (e) {
@@ -482,9 +484,9 @@ class _DetailPageState extends State<DetailPage> {
                   onTap: () {
                     if (_busy) return;
                     // Tactile + audible feedback on press.
-                    HapticFeedback.selectionClick();
-                    SystemSound.play(SystemSoundType.click);
-                    _openRandom();
+                    unawaited(HapticFeedback.selectionClick());
+                    unawaited(SystemSound.play(SystemSoundType.click));
+                    unawaited(_openRandom());
                   },
                 ),
               ),
@@ -671,7 +673,7 @@ class _DetailPageState extends State<DetailPage> {
           onTap: busy
               ? null
               : () {
-                  HapticFeedback.selectionClick();
+                  unawaited(HapticFeedback.selectionClick());
                   onTap();
                 },
           child: Ink(

@@ -44,13 +44,15 @@ Future<void> main() async {
   // the same app looked different depending on where the user had been.
   // Every screen already lays out for it: the chrome sits in SafeArea and the
   // grids scroll under the bars. Bar colours come from [_systemBars].
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   // Firebase must init before any Firebase service (Crashlytics/Analytics/RC).
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Route uncaught Flutter framework + async errors to Crashlytics.
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
   PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    unawaited(
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true),
+    );
     return true;
   };
   // Yandex AppMetrica — CIS analytics + free install attribution + push. Skipped
@@ -76,7 +78,7 @@ Future<void> main() async {
   // Bound the in-memory image cache so decoding many 4K wallpapers can't OOM.
   PaintingBinding.instance.imageCache.maximumSizeBytes = 100 << 20; // ~100 MB
   // Remove leftover temp download files from earlier runs (fire-and-forget).
-  WallpaperService.instance.cleanTemp();
+  unawaited(WallpaperService.instance.cleanTemp());
   // Pre-warm the liquid-glass shaders (prevents first-frame jank). iOS only —
   // Android uses solid variants everywhere, so no shader compilation at all.
   // enablePerformanceMonitor: false — otherwise it draws a colored border overlay.
@@ -131,7 +133,7 @@ class _WallpaperAppState extends State<WallpaperApp> {
     // After the first frame: a link that launched the app is replayed here, and
     // pushing onto a navigator that has not mounted yet would be dropped.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      DeepLinkService.instance.init(WallpaperApp.navigatorKey);
+      unawaited(DeepLinkService.instance.init(WallpaperApp.navigatorKey));
     });
   }
 

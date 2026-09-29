@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -135,7 +137,7 @@ class PushService extends ChangeNotifier {
     final link = message.data['link'];
     if (link is! String || link.isEmpty) return;
     final uri = Uri.tryParse(link);
-    if (uri != null) DeepLinkService.instance.handleUri(uri);
+    if (uri != null) unawaited(DeepLinkService.instance.handleUri(uri));
   }
 
   Future<void> _save() async {

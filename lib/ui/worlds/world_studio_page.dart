@@ -46,7 +46,7 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    unawaited(_load());
   }
 
   Future<void> _load() async {
@@ -282,7 +282,7 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
     return PopScope(
       canPop: _leaving || (!_dirty && !_preview && _busy == null),
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _leave();
+        if (!didPop) unawaited(_leave());
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF0B1120),
@@ -455,7 +455,7 @@ class _WorldStudioPageState extends State<WorldStudioPage> {
                                   : Icons.bookmark_border_rounded,
                               tooltip: 'Save world',
                               onTap: () {
-                                if (_busy == null) _save();
+                                if (_busy == null) unawaited(_save());
                               },
                             ),
                           ],

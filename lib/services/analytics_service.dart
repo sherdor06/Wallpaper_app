@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:appmetrica_plugin/appmetrica_plugin.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 
@@ -21,11 +23,18 @@ class AnalyticsService {
   /// Sends one event to Firebase and (when a key is set) Yandex AppMetrica.
   /// Both calls are fire-and-forget.
   static void _log(String name, Map<String, Object> params) {
-    _analytics.logEvent(name: name, parameters: params);
+    _quietly(_analytics.logEvent(name: name, parameters: params));
     if (AppConfig.hasAppMetrica) {
-      AppMetrica.reportEventWithMap(name, params);
+      _quietly(AppMetrica.reportEventWithMap(name, params));
     }
   }
+
+  /// Fire-and-forget that means it. An unawaited future that fails lands in
+  /// `PlatformDispatcher.onError`, which main.dart reports to Crashlytics as a
+  /// *fatal* crash — so a hiccup on an analytics channel would have shown up
+  /// as the app crashing when nothing had.
+  static void _quietly(Future<void> call) =>
+      unawaited(call.catchError((Object _) {}));
 
   static void logWallpaperView(String id, {String? category}) {
     _log('wallpaper_view', <String, Object>{
