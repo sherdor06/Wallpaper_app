@@ -13,6 +13,8 @@
 		     ships. See the note on that key. -->
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>Saves wallpapers to your photo library.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Choose a photo to create your own wallpaper world.</string>
 		<!-- App Tracking Transparency: shown before requesting personalized ads. -->
 		<key>NSUserTrackingUsageDescription</key>
 		<string>Your data is used to show you more relevant ads.</string>

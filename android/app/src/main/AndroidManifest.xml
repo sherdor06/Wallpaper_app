@@ -2,6 +2,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <!-- Android 13+ gates notifications behind a runtime prompt. PushService
          asks for it only after the user has applied a couple of wallpapers —
          a prompt on first launch is mostly denied, and Android gives one. -->
@@ -29,6 +30,18 @@
                 android:resource="@xml/live_wallpaper" />
         </service>
 
+
+        <service
+            android:name="com.sherdor.wallpapers.WorldWallpaperService"
+            android:label="@string/world_wallpaper_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data android:name="android.service.wallpaper"
+                android:resource="@xml/world_wallpaper" />
+        </service>
 
         <!-- FQCN: paket nomi bilan to‘liq -->
         <activity

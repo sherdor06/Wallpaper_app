@@ -5,6 +5,7 @@ import '../../models/collection.dart';
 import '../../models/wallpaper.dart';
 import '../../services/remote_config_service.dart';
 import '../accent.dart';
+import '../worlds/worlds_page.dart';
 import '../widgets/wallpaper_thumb.dart';
 import '../widgets/wallpaper_grid.dart';
 import 'category_carousel.dart';
@@ -104,6 +105,7 @@ class EditorialHome extends StatelessWidget {
                 ),
               ),
             ),
+          const SliverToBoxAdapter(child: WorldsDiscoveryCard()),
           if (featured != null)
             SliverToBoxAdapter(
               child: _Spotlight(

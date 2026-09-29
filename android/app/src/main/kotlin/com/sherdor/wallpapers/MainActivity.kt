@@ -20,6 +20,7 @@ import kotlin.math.max
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "wallpaper.channel/setter"
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val worldWallpaper by lazy { WorldWallpaperController(this) }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -30,10 +31,18 @@ class MainActivity : FlutterActivity() {
                     "setWallpaper" -> handleSetWallpaper(call, result)
                     "saveImageToGallery" -> handleSaveToGallery(call, result)
                     "setLiveWallpaper" -> handleSetLiveWallpaper(call, result)
+                    "setWorldWallpaper" -> worldWallpaper.open(call, result)
+                    "needsGalleryPermission" -> result.success(Build.VERSION.SDK_INT < 29)
                     "isEmulator" -> result.success(isEmulator())
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    @Deprecated("Used by the system live wallpaper preview")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == WorldWallpaperController.REQUEST) worldWallpaper.onResult(resultCode)
     }
 
     private fun handleSetWallpaper(
@@ -114,12 +123,14 @@ class MainActivity : FlutterActivity() {
         Thread {
             try {
                 val src = File(path)
-                val name = "wallpaper_${System.currentTimeMillis()}.jpg"
+                val png = path.endsWith(".png", ignoreCase = true)
+                val extension = if (png) "png" else "jpg"
+                val name = "wallpaper_${System.currentTimeMillis()}.$extension"
                 val resolver = applicationContext.contentResolver
 
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, name)
-                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.MIME_TYPE, if (png) "image/png" else "image/jpeg")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         put(
                             MediaStore.Images.Media.RELATIVE_PATH,

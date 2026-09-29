@@ -77,6 +77,7 @@ dependencies:
   share_plus: ^12.0.2
   app_links: ^7.2.1
   firebase_messaging: ^16.6.0
+  image_picker: ^1.2.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -140,6 +141,14 @@ flutter:
   assets:
     - assets/catalog.sample.json
     - assets/anim/
+    - assets/worlds/
+    - assets/fonts/OFL-InstrumentSerif.txt
+  fonts:
+    - family: InstrumentSerif
+      fonts:
+        - asset: assets/fonts/InstrumentSerif-Regular.ttf
+        - asset: assets/fonts/InstrumentSerif-Italic.ttf
+          style: italic
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

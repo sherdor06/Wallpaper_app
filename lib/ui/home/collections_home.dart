@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/wallpaper_repository.dart';
 import '../../models/collection.dart';
 import '../widgets/wallpaper_thumb.dart';
+import '../worlds/worlds_page.dart';
 import '../widgets/wallpaper_grid.dart' show gridColumnsFor;
 import 'collection_page.dart';
 
@@ -31,21 +32,29 @@ class CollectionsHome extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: LayoutBuilder(
-        builder: (context, constraints) => GridView.builder(
-          padding: EdgeInsets.fromLTRB(8, topPadding, 8, bottom),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            // Same column rule as the wallpaper grid, so a tablet gets more
-            // cards rather than two enormous ones.
-            crossAxisCount: gridColumnsFor(constraints.maxWidth),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 0.9,
-          ),
-          itemCount: collections.length,
-          itemBuilder: (context, i) => _CollectionCard(
-            collection: collections[i],
-            onTap: () => openCollection(context, collections[i]),
-          ),
+        builder: (context, constraints) => CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: SizedBox(height: topPadding)),
+            const SliverToBoxAdapter(child: WorldsDiscoveryCard()),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(8, 0, 8, bottom),
+              sliver: SliverGrid.builder(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  // Same column rule as the wallpaper grid, so a tablet gets more
+                  // cards rather than two enormous ones.
+                  crossAxisCount: gridColumnsFor(constraints.maxWidth),
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 0.9,
+                ),
+                itemCount: collections.length,
+                itemBuilder: (context, i) => _CollectionCard(
+                  collection: collections[i],
+                  onTap: () => openCollection(context, collections[i]),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

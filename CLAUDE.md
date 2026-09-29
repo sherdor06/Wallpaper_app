@@ -92,6 +92,41 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
   uslub) — "Girls" emas. `girly` = pushti/kawaii/bantik; `aesthetic` = umumiy
   estetik fotolar (mushuk, qahva, sokin manzara).
 
+## Wavely Worlds
+
+- Worlds = foydalanuvchi rasmi (yoki `assets/worlds/` sahnasi) + ob-havo /
+  palitra / harakat sozlamalari (`WorldSettings`). Chizish bitta joyda —
+  `WorldPainter` (`ui/worlds/world_scene.dart`): jonli sahna, muqova, still
+  eksport va video kadrlar hammasi shundan; `time` bo'yicha deterministik.
+  Android `WorldWallpaperService.kt` shu chizishning native nusxasi — rang
+  koeffitsientlari va zarrachalar ikkalasida bir xil tutiladi.
+- "Jonli" ikki xil, platformaga qarab:
+  - **Android** — dunyo *o'zi* wallpaper: `setWorldWallpaper` → tizim
+    preview → foydalanuvchi tasdiqlaydi (`supportsLiveWallpaper`).
+  - **iOS** — hech qanday ilova wallpaper o'rnata olmaydi; dunyo Photos'ga
+    **Live Photo** bo'lib saqlanadi (`supportsLivePhoto`,
+    `WorldsService.saveLivePhoto` → `LivePhotoWriter.swift`), foydalanuvchi
+    Photos'da Lock Screen qilib tanlaydi. Lock Screen harakati har bir iOS
+    versiyasida kafolatlanmaydi — haqiqiy telefonda alohida tekshiriladi.
+    Klip 2 s, 30 fps, balandligi 2304 px, H.264 MOV; still — klipning
+    **o'rta** kadri, video bilan bir xil o'lchamda. Kadrlar Dart'da render
+    qilinib raw RGBA holida bittalab
+    kanal orqali yuboriladi (`livePhotoBegin/Frame/Finish/Cancel`), native
+    tomonda BGRA'ga o'girilib encoder'ga beriladi. JPEG'dagi Apple maker
+    note `17` va MOV'dagi `content.identifier` + `still-image-time` treki —
+    Photos juftlashtirishi uchun shart; bularsiz oddiy rasm + video bo'ladi.
+  - Ikkalasida ham "Save image" (still) va "Share image" qoladi.
+- Animatsiya widget daraxtini qayta qurmaydi: faqat canvas, 30 fps;
+  sahifa ko'rinmaganda, fonda yoki harakat o'chirilganda ticker to'xtaydi.
+  Live Photo progressi alohida notifier'da; butun editor har kadrda rebuild
+  bo'lmaydi. Bir paytda faqat bitta eksport; encoder kutishi chegaralangan,
+  xato/ruxsat rad etilganda vaqtinchalik fayllar tozalanadi.
+- Kutubxona fonda yuklanadi; uni ochgan sahifa tayyor bo'lishini kutadi.
+  Saqlangan ro'yxat o'zgarmas snapshot: faqat yozilganda yangilanadi,
+  grid katagini chizish uchun har safar butun ro'yxat nusxalanmaydi.
+- Yangi Swift fayl Xcode target'ga `xcodeproj` gem bilan qo'shiladi
+  (CocoaPods bilan keladi), pbxproj qo'lda tahrirlanmaydi.
+
 ## Kontent manbalari
 
 - Faqat Telegram. Hashtag'li (odatiy rejim): `@iphonefotohd`, `@phone_wallps`.

@@ -5,9 +5,11 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:appmetrica_plugin/appmetrica_plugin.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart'
+    show kDebugMode, LicenseRegistry, LicenseEntryWithLineBreaks;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show SystemChrome, SystemUiMode, SystemUiOverlayStyle;
+import 'package:flutter/services.dart'
+    show SystemChrome, SystemUiMode, SystemUiOverlayStyle, rootBundle;
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'config/app_config.dart';
@@ -25,11 +27,17 @@ import 'services/remote_config_service.dart';
 import 'services/theme_service.dart';
 import 'services/unlock_service.dart';
 import 'services/wallpaper_service.dart';
+import 'services/worlds_service.dart';
 import 'ui/accent.dart';
 import 'ui/splash_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'Instrument Serif',
+    ], await rootBundle.loadString('assets/fonts/OFL-InstrumentSerif.txt'));
+  });
   // Edge-to-edge from the first frame, on every Android version — not only
   // where Android 15 forces it. Before this, older Android kept opaque system
   // bars until the first detail page was dismissed and switched the mode, so
@@ -96,6 +104,9 @@ Future<void> main() async {
   await ThemeService.instance.init();
   await HomeLayoutService.instance.init();
   await SearchService.instance.init();
+  // The library awaits its own readiness. Photo-picker recovery and disk
+  // reads need not keep the home screen behind the launch screen.
+  unawaited(WorldsService.instance.init());
   // After history: PushService reads the applied-wallpaper count to decide
   // whether the permission prompt has been earned yet.
   await PushService.instance.init();
