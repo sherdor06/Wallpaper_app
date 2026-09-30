@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 /// App configuration (provided at compile time via `--dart-define`).
 ///
 /// The CDN base URL is not hardcoded — so test/prod can be switched easily.
@@ -40,8 +42,10 @@ class AppConfig {
     defaultValue: 'c94e6a6e-c3cc-4482-9e48-0ab8c93f8aa0',
   );
 
-  /// Whether Yandex AppMetrica is configured (a key was provided).
-  static bool get hasAppMetrica => appMetricaApiKey.isNotEmpty;
+  /// Whether Yandex AppMetrica runs: a key was provided and this is not a
+  /// debug build. Debug runs would otherwise report development errors and
+  /// test taps into the production app's statistics.
+  static bool get hasAppMetrica => appMetricaApiKey.isNotEmpty && !kDebugMode;
 
   static String _trimSlash(String url) =>
       url.endsWith('/') ? url.substring(0, url.length - 1) : url;

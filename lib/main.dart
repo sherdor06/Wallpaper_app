@@ -1,5 +1,5 @@
 import 'dart:async' show unawaited;
-import 'dart:io' show Platform;
+import 'dart:io' show HttpException, Platform, SocketException;
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:appmetrica_plugin/appmetrica_plugin.dart';
@@ -31,6 +31,18 @@ import 'services/worlds_service.dart';
 import 'ui/accent.dart';
 import 'ui/splash_gate.dart';
 
+/// A thumbnail that fails to load on a dropped connection reaches this handler
+/// through the image cache. That is weather, not a crash: it is recorded as a
+/// non-fatal so it stays visible without counting against crash-free users.
+void _reportFlutterError(FlutterErrorDetails details) {
+  final e = details.exception;
+  if (e is SocketException || e is HttpException) {
+    unawaited(FirebaseCrashlytics.instance.recordFlutterError(details));
+    return;
+  }
+  unawaited(FirebaseCrashlytics.instance.recordFlutterFatalError(details));
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
@@ -47,14 +59,22 @@ Future<void> main() async {
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   // Firebase must init before any Firebase service (Crashlytics/Analytics/RC).
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // Route uncaught Flutter framework + async errors to Crashlytics.
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-  PlatformDispatcher.instance.onError = (error, stack) {
-    unawaited(
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true),
-    );
-    return true;
-  };
+  // Route uncaught Flutter framework + async errors to Crashlytics — from
+  // release builds only. In development one layout slip repeats every frame,
+  // and those "crashes" landed on the same dashboards as users': 680 of the
+  // 682 in one September week came from the emulator and simulator.
+  unawaited(
+    FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode),
+  );
+  if (!kDebugMode) {
+    FlutterError.onError = _reportFlutterError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      unawaited(
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true),
+      );
+      return true;
+    };
+  }
   // Yandex AppMetrica — CIS analytics + free install attribution + push. Skipped
   // when no key is provided (--dart-define=APPMETRICA_API_KEY=...). Crash
   // reporting stays OFF so Firebase Crashlytics remains the single crash owner
