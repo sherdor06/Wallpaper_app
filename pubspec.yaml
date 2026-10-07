@@ -78,6 +78,7 @@ dependencies:
   app_links: ^7.2.1
   firebase_messaging: ^16.6.0
   image_picker: ^1.2.3
+  in_app_review: ^2.0.12          # store rating sheet (see ReviewService)
 dev_dependencies:
   flutter_test:
     sdk: flutter

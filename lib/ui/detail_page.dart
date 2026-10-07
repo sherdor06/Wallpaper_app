@@ -18,6 +18,7 @@ import '../services/image_cache.dart';
 import '../services/remote_config_service.dart';
 import '../services/deep_link_service.dart';
 import '../services/push_service.dart';
+import '../services/review_service.dart';
 import '../services/unlock_service.dart';
 import '../services/wallpaper_service.dart';
 import 'accent.dart';
@@ -283,8 +284,9 @@ class _DetailPageState extends State<DetailPage> {
       // Unconditional: AdService's shared full-screen cooldown suppresses this
       // when the unlock above just played a rewarded ad, so there is no need to
       // gate it on the wallpaper having been unlocked.
-      await AdService.instance.maybeShowInterstitial();
+      final adPlayed = await AdService.instance.maybeShowInterstitial();
       _setSaveState(_SaveState.done, revertAfter: _doneHold);
+      if (!adPlayed) unawaited(ReviewService.instance.maybeAsk());
     } on PlatformException catch (e) {
       _setSaveState(_SaveState.locked);
       _snack('Error: ${e.message}');
@@ -320,8 +322,9 @@ class _DetailPageState extends State<DetailPage> {
       AnalyticsService.logWallpaperDownload(_w.id);
       unawaited(HistoryService.instance.add(_w.id));
       unawaited(PushService.instance.maybeAskPermission());
-      await AdService.instance.maybeShowInterstitial();
+      final adPlayed = await AdService.instance.maybeShowInterstitial();
       _snack('Saved to gallery');
+      if (!adPlayed) unawaited(ReviewService.instance.maybeAsk());
     } catch (_) {
       _snack('Couldn\'t save');
     } finally {
@@ -356,9 +359,10 @@ class _DetailPageState extends State<DetailPage> {
       // iOS's main action, so this is the only place an iPhone user reaches
       // the prompt without going to Settings.
       unawaited(PushService.instance.maybeAskPermission());
-      await AdService.instance.maybeShowInterstitial();
+      final adPlayed = await AdService.instance.maybeShowInterstitial();
       // Success is reported inside the panel, not as a snack.
       _setSaveState(_SaveState.done, revertAfter: _doneHold);
+      if (!adPlayed) unawaited(ReviewService.instance.maybeAsk());
     } on PlatformException catch (e) {
       // Real errors still snack — the panel only speaks about the ad/save flow.
       _setSaveState(_SaveState.locked);

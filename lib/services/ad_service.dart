@@ -312,11 +312,16 @@ class AdService {
   /// Safe to call unconditionally, including immediately after a rewarded
   /// unlock: the cooldown in [_showInterstitial] rejects it. Callers must NOT
   /// re-implement that check themselves.
-  Future<void> maybeShowInterstitial() async {
-    if (_adsOff || !_canRequestAds) return;
+  ///
+  /// Returns whether an ad actually played, so the caller can keep anything
+  /// else that interrupts (the review sheet) off the back of it.
+  Future<bool> maybeShowInterstitial() async {
+    if (_adsOff || !_canRequestAds) return false;
     _actionCount++;
-    if (_actionCount % _showEvery != 0) return;
-    await _showInterstitial('Wallpaper applied — $_actionCount of every $_showEvery');
+    if (_actionCount % _showEvery != 0) return false;
+    return _showInterstitial(
+      'Wallpaper applied — $_actionCount of every $_showEvery',
+    );
   }
 
   /// Show an interstitial while the user browses (the shuffle button) — the
@@ -334,9 +339,9 @@ class AdService {
 
   /// Shows the preloaded interstitial if the shared full-screen cooldown has
   /// elapsed. No-op if too soon or none ready. [trigger] is what the
-  /// simulator stand-in reports as the reason.
-  Future<void> _showInterstitial(String trigger) async {
-    if (DateTime.now().difference(_lastFullScreen) < _minGap) return;
+  /// simulator stand-in reports as the reason. Returns whether one was shown.
+  Future<bool> _showInterstitial(String trigger) async {
+    if (DateTime.now().difference(_lastFullScreen) < _minGap) return false;
     if (_simulated) {
       _noteFullScreenShown();
       await _showStandIn(
@@ -344,13 +349,13 @@ class AdService {
         trigger: trigger,
         unitId: Platform.isIOS ? _interstitialIos : _interstitialAndroid,
       );
-      return;
+      return true;
     }
     final ad = _interstitial;
     if (ad == null) {
       // Nothing loaded — start one for next time rather than waiting on it now.
       unawaited(_preloadInterstitial());
-      return;
+      return false;
     }
     _interstitial = null;
     _noteFullScreenShown();
@@ -360,11 +365,14 @@ class AdService {
       await ad.show();
       await ad.waitForDismiss().timeout(_rewardTimeoutAfter);
     } catch (_) {
-      // A failed show costs nothing here — there is no caller waiting on it.
+      // A failed show costs nothing here — the user just sees no ad.
     } finally {
       await ad.destroy();
       unawaited(_preloadInterstitial());
     }
+    // True even if the show failed part-way: the screen may already have
+    // flickered, and the cooldown above has started either way.
+    return true;
   }
 
   /// Records that a full-screen ad was just shown, starting the cooldown that

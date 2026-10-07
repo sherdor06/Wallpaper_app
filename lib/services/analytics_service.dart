@@ -77,4 +77,10 @@ class AnalyticsService {
       'target': target,
     });
   }
+
+  /// The store rating sheet was requested. Counts asks, not reviews: the store
+  /// never says whether the sheet appeared or what was submitted.
+  static void logReviewPrompt() {
+    _log('review_prompt', <String, Object>{});
+  }
 }

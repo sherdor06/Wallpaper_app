@@ -40,10 +40,15 @@ class PushService extends ChangeNotifier {
 
   bool _enabled = false;
   bool _asked = false;
+  bool _promptedThisRun = false;
   File? _file;
 
   /// Whether notifications are on. Drives the Settings switch.
   bool get enabled => _enabled;
+
+  /// Whether [maybeAskPermission] put the system prompt up in this run, so the
+  /// review sheet can stay out of its way.
+  bool get promptedThisRun => _promptedThisRun;
 
   /// Loads the stored state. Called before `runApp`.
   Future<void> init() async {
@@ -121,6 +126,7 @@ class PushService extends ChangeNotifier {
   Future<void> maybeAskPermission() async {
     if (_asked || _enabled) return;
     if (HistoryService.instance.ids.length < _promptAfterApplies) return;
+    _promptedThisRun = true;
     await requestPermission();
   }
 
