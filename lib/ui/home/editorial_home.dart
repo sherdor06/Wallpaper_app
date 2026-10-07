@@ -43,20 +43,21 @@ class EditorialHome extends StatelessWidget {
   /// row still reads as a taste of the category rather than the category.
   static const _rowLength = 12;
 
-  /// Today's hero, chosen by the date so it changes daily and is the same for
-  /// everyone that day — a rotation, not a random reshuffle on every open.
-  /// Live wallpapers are excluded: a still frame of a video reads as a broken
-  /// image up here.
-  Wallpaper? _heroFor(DateTime now) {
-    final stills = catalog.wallpapers.where((w) => !w.isLive).toList();
-    if (stills.isEmpty) return null;
-    // Rotate through the titled ones: "Milky Way" carries a hero, "Space 12"
-    // does not — and the untitled ones are the likelier mis-files (see
-    // [Wallpaper.isAutoTitled]). Fall back to everything if none qualify.
-    final titled = stills.where((w) => !w.isAutoTitled).toList();
-    final pool = titled.isEmpty ? stills : titled;
-    final day = now.difference(DateTime(2026)).inDays;
-    return pool[day % pool.length];
+  /// The hero: a different one on every launch, steady while the app is open.
+  /// The repository shuffles the catalog once per load, so the first fit is
+  /// already a fresh pick. Live wallpapers are excluded: a still frame of a
+  /// video reads as a broken image up here.
+  Wallpaper? _hero() {
+    // Titled ones first: "Milky Way" carries a hero, "Space 12" does not —
+    // and the untitled ones are the likelier mis-files (see
+    // [Wallpaper.isAutoTitled]). Any still if none qualify.
+    Wallpaper? fallback;
+    for (final w in catalog.wallpapers) {
+      if (w.isLive) continue;
+      if (!w.isAutoTitled) return w;
+      fallback ??= w;
+    }
+    return fallback;
   }
 
   /// The collection for [id] if it is big enough to be advertised — the
@@ -84,7 +85,7 @@ class EditorialHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hero = _heroFor(DateTime.now());
+    final hero = _hero();
     final featured = _featured();
     final carousel = _carousel();
     final bottom = MediaQuery.paddingOf(context).bottom + 8;
