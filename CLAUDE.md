@@ -179,6 +179,28 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - Chastota Remote Config'da: `ad_show_every`, `ad_browse_every`,
   `ad_min_gap_seconds`. Kamida bir haftalik ma'lumotsiz o'zgartirilmaydi.
 
+## Push, baho, yangilanish
+
+- Push: FCM topic `all`. Kampaniya custom data'si: `link` (share URL —
+  wallpaper ochiladi), `campaign` (analytics nomi; bo'lmasa sarlavha).
+  Bosilganda `push_open`. Ilova ochiq paytda kelgan push ko'rsatilmaydi.
+- Android kanal `new_wallpapers` (HIGH) `MainActivity` da yaratiladi, ikonka
+  `ic_notification`. Kanal id'si o'zgartirilmaydi.
+- Ruxsat: Android 13+/iOS — 2 ta apply/save'dan keyin; Android ≤12 — launch'da
+  so'rovsiz obuna. Settings'da o'chirilgani qayta yoqilmaydi.
+- Test push faqat token bilan (debug konsolida `FCM token:`), hech qachon
+  `all` ga emas — u haqiqiy foydalanuvchilarga ketadi.
+- iOS push hali yo'q: APNs kaliti (Firebase'ga) + Push capability kerak.
+- In-app review: 3 ta apply/save, 60 kun oraliq; reklama yoki push so'rovi
+  chiqqan bosishda so'ralmaydi.
+- Yangilanish: Remote Config `update_latest_build` (yumshoq, Play flexible) va
+  `update_min_build` (majburiy sahifa), build raqami (`+N`) bo'yicha. Default 0.
+  Faqat Android. Test: `flutter build apk --debug --build-number=5`,
+  `adb install -r -d` (ma'lumot saqlanadi) va qiymat 6. `flutter run` bu
+  opsiyani qabul qilmaydi.
+- Remote Config launch'da ko'pi bilan 3 s kutadi; kechikkan fetch keyingi
+  launch'da qo'llanadi.
+
 ## Git
 
 - **Commit faqat foydalanuvchi "commit" deganda** — ish tugagach, saralab:
