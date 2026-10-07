@@ -319,6 +319,7 @@ class _DetailPageState extends State<DetailPage> {
       );
       AnalyticsService.logWallpaperDownload(_w.id);
       unawaited(HistoryService.instance.add(_w.id));
+      unawaited(PushService.instance.maybeAskPermission());
       await AdService.instance.maybeShowInterstitial();
       _snack('Saved to gallery');
     } catch (_) {
@@ -352,6 +353,9 @@ class _DetailPageState extends State<DetailPage> {
       );
       AnalyticsService.logWallpaperDownload(_w.id);
       unawaited(HistoryService.instance.add(_w.id));
+      // iOS's main action, so this is the only place an iPhone user reaches
+      // the prompt without going to Settings.
+      unawaited(PushService.instance.maybeAskPermission());
       await AdService.instance.maybeShowInterstitial();
       // Success is reported inside the panel, not as a snack.
       _setSaveState(_SaveState.done, revertAfter: _doneHold);

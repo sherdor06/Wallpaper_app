@@ -40,6 +40,11 @@ class DeepLinkService {
   StreamSubscription<Uri>? _sub;
   GlobalKey<NavigatorState>? _navigator;
 
+  /// A link that arrived before [init] had a navigator to push on — a
+  /// notification tapped on a cold start is read before `runApp`. Replayed
+  /// by [init] rather than dropped.
+  Uri? _pending;
+
   /// The URL to share for [wallpaperId].
   ///
   /// Ids carry a slash (`nature/tg_18493`) and become path segments, so the
@@ -64,6 +69,9 @@ class DeepLinkService {
   /// [AppLinks.getInitialLink] and would otherwise be missed.
   Future<void> init(GlobalKey<NavigatorState> navigator) async {
     _navigator = navigator;
+    final pending = _pending;
+    _pending = null;
+    if (pending != null) unawaited(handleUri(pending));
     _sub ??= _appLinks.uriLinkStream.listen(
       handleUri,
       // A malformed link is the sender's problem, not a crash.
@@ -85,6 +93,10 @@ class DeepLinkService {
   Future<void> handleUri(Uri uri) async {
     final id = wallpaperIdFrom(uri);
     if (id == null) return;
+    if (_navigator == null) {
+      _pending = uri;
+      return;
+    }
 
     // The catalog may still be loading on a cold start; this awaits it rather
     // than dropping the link.

@@ -68,4 +68,13 @@ class AnalyticsService {
   static void logAdImpression(String type) {
     _log('ad_impression', <String, Object>{'ad_type': type});
   }
+
+  /// A push notification was tapped. [target] is `link` when it opened a
+  /// wallpaper, `app` when it only opened the app.
+  static void logPushOpen({required String campaign, required String target}) {
+    _log('push_open', <String, Object>{
+      'campaign': campaign,
+      'target': target,
+    });
+  }
 }
