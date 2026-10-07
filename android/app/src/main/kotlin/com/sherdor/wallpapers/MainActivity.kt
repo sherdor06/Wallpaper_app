@@ -1,5 +1,7 @@
 package com.sherdor.wallpapers
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.ContentValues
@@ -7,6 +9,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +24,29 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "wallpaper.channel/setter"
     private val mainHandler = Handler(Looper.getMainLooper())
     private val worldWallpaper by lazy { WorldWallpaperController(this) }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        createPushChannel()
+    }
+
+    /**
+     * The channel FCM posts push to (see the manifest). High importance is what
+     * lets a notification drop down over the screen; the system default only
+     * puts an icon in the status bar. Creating it again is a no-op, and once it
+     * exists the user owns its settings. The notification prompt only comes
+     * after the app has been opened, so the channel is always here before the
+     * first message can be shown.
+     */
+    private fun createPushChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val channel = NotificationChannel(
+            getString(R.string.push_channel_id),
+            getString(R.string.push_channel_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply { description = getString(R.string.push_channel_description) }
+        getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

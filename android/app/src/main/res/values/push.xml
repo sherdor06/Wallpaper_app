@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- One id for both sides: the manifest names it as FCM's default channel
+         and MainActivity creates it. Changing it strands the old channel's
+         user settings, so it stays fixed. -->
+    <string name="push_channel_id" translatable="false">new_wallpapers</string>
+    <string name="push_channel_name">New wallpapers</string>
+    <string name="push_channel_description">When new wallpapers are added to Wavely.</string>
+</resources>

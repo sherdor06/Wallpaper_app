@@ -83,5 +83,22 @@
         </activity>
 
         <meta-data android:name="flutterEmbedding" android:value="2" />
+
+        <!-- Push. A message that arrives while the app is in the background is
+             drawn by FCM itself, from these defaults. Without the channel it
+             falls back to "Miscellaneous", whose default importance never pops
+             up over the screen; without the icon, Android tints the
+             full-colour launcher icon into a white square. MainActivity
+             creates the channel. A message that arrives with the app open goes
+             to the app instead and is not drawn at all. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/push_channel_id" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
     </application>
 </manifest>
