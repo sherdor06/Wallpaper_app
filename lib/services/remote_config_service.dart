@@ -51,6 +51,11 @@ class RemoteConfigService {
   static const int _defUpdateLatestBuild = 0;
   static const int _defUpdateMinBuild = 0;
 
+  /// How long launch waits for a fetch. Launch sits behind the native splash
+  /// until this returns, so the full [RemoteConfigSettings.fetchTimeout] was up
+  /// to eight seconds of logo on a slow connection, about once an hour.
+  static const _launchBudget = Duration(seconds: 3);
+
   FirebaseRemoteConfig? _rc;
 
   /// Loads defaults, then fetches + activates the latest values. Never throws —
@@ -78,11 +83,21 @@ class RemoteConfigService {
         _kUpdateLatestBuild: _defUpdateLatestBuild,
         _kUpdateMinBuild: _defUpdateMinBuild,
       });
-      await rc.fetchAndActivate();
+      // Readable from here on: the values activated on an earlier launch, or
+      // the defaults. A failed fetch used to leave [_rc] null, so an offline
+      // start fell back to hard-coded defaults — the ad kill switch included —
+      // even with last session's values on disk.
       _rc = rc;
+      // A fetch that overruns [_launchBudget] still finishes in the
+      // background, but is only activated on the next launch: values that
+      // change while the home screen is up would rearrange it under the user.
+      final fetched = await rc
+          .fetch()
+          .then((_) => true)
+          .timeout(_launchBudget, onTimeout: () => false);
+      if (fetched) await rc.activate();
     } catch (_) {
-      // Keep defaults on any failure.
-      _rc = null;
+      // Keep whatever is active.
     }
   }
 

@@ -118,14 +118,28 @@ Future<void> main() async {
   if (!Platform.isAndroid) {
     await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
   }
-  // Remote Config first — AdService reads the ad kill switch / frequency from
-  // it, and ConsentService reads the `consent_required` region flag.
-  await RemoteConfigService.instance.init();
-  // This build's number. The splash compares it with Remote Config's update
-  // thresholds on its first frame.
-  await UpdateService.instance.init();
-  // Then the stored consent answer, so [ConsentService.isRequired] is truthful
-  // by the time the splash finishes and decides whether to ask.
+  // Everything launch must know before the first frame, side by side: Remote
+  // Config is the long pole (up to its launch budget on a slow network), and
+  // the rest are small local reads that need nothing from it or from each
+  // other. One after another, each paid for its own trip to the platform for
+  // the support directory.
+  await Future.wait([
+    RemoteConfigService.instance.init(),
+    // Its thresholds are read at the end of the splash, not here.
+    UpdateService.instance.init(),
+    FavoritesService.instance.init(),
+    HistoryService.instance.init(),
+    UnlockService.instance.init(),
+    ThemeService.instance.init(),
+    HomeLayoutService.instance.init(),
+    SearchService.instance.init(),
+    // Reads the notification that launched the app, if one did; its link
+    // waits in DeepLinkService for the navigator.
+    PushService.instance.init(),
+  ]);
+  // After Remote Config, which carries the `consent_required` region flag, so
+  // [ConsentService.isRequired] is truthful by the time the splash finishes
+  // and decides whether to ask.
   await ConsentService.instance.init();
   // Ad init — deliberately NOT awaited. Nothing on screen needs it: the banner
   // awaits [AdService.adsAllowed] itself, and every interstitial/rewarded path
@@ -135,19 +149,9 @@ Future<void> main() async {
   // The navigator is for the simulator stand-in page (debug only); a device
   // build never touches it.
   unawaited(AdService.instance.init(navigator: WallpaperApp.navigatorKey));
-  // Load favorites + unlocked (4K) wallpapers + theme choice from disk.
-  await FavoritesService.instance.init();
-  await HistoryService.instance.init();
-  await UnlockService.instance.init();
-  await ThemeService.instance.init();
-  await HomeLayoutService.instance.init();
-  await SearchService.instance.init();
   // The library awaits its own readiness. Photo-picker recovery and disk
   // reads need not keep the home screen behind the launch screen.
   unawaited(WorldsService.instance.init());
-  // After history: PushService reads the applied-wallpaper count to decide
-  // whether the permission prompt has been earned yet.
-  await PushService.instance.init();
   runApp(const WallpaperApp());
 }
 
