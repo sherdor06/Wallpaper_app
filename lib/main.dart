@@ -26,6 +26,7 @@ import 'services/push_service.dart';
 import 'services/remote_config_service.dart';
 import 'services/theme_service.dart';
 import 'services/unlock_service.dart';
+import 'services/update_service.dart';
 import 'services/wallpaper_service.dart';
 import 'services/worlds_service.dart';
 import 'ui/accent.dart';
@@ -120,6 +121,9 @@ Future<void> main() async {
   // Remote Config first — AdService reads the ad kill switch / frequency from
   // it, and ConsentService reads the `consent_required` region flag.
   await RemoteConfigService.instance.init();
+  // This build's number. The splash compares it with Remote Config's update
+  // thresholds on its first frame.
+  await UpdateService.instance.init();
   // Then the stored consent answer, so [ConsentService.isRequired] is truthful
   // by the time the splash finishes and decides whether to ask.
   await ConsentService.instance.init();

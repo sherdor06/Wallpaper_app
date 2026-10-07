@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../data/wallpaper_repository.dart';
 import '../models/wallpaper.dart';
+import 'update_service.dart';
 import '../ui/detail_page.dart';
 
 /// Turns a shared wallpaper link into an open detail page.
@@ -93,6 +94,9 @@ class DeepLinkService {
   Future<void> handleUri(Uri uri) async {
     final id = wallpaperIdFrom(uri);
     if (id == null) return;
+    // A build below the supported floor shows nothing but the update page;
+    // a link must not open the app around it.
+    if (UpdateService.instance.need == UpdateNeed.required) return;
     if (_navigator == null) {
       _pending = uri;
       return;

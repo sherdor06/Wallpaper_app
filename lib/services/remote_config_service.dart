@@ -22,6 +22,8 @@ class RemoteConfigService {
   static const _kConsentRequired = 'consent_required';
   static const _kFeaturedCategory = 'featured_category';
   static const _kHomeStrip = 'home_strip';
+  static const _kUpdateLatestBuild = 'update_latest_build';
+  static const _kUpdateMinBuild = 'update_min_build';
 
   // Safe defaults (identical to the old constants) — used until/unless the
   // console overrides them.
@@ -44,6 +46,10 @@ class RemoteConfigService {
   // unknown or thin ones are dropped by the home screen.
   static const String _defHomeStrip =
       'girly,aesthetic,nature,animals,cars,space,anime,city';
+  // Zero: no build is behind, so nobody is asked to update until a value is
+  // published. See UpdateService.
+  static const int _defUpdateLatestBuild = 0;
+  static const int _defUpdateMinBuild = 0;
 
   FirebaseRemoteConfig? _rc;
 
@@ -69,6 +75,8 @@ class RemoteConfigService {
         _kConsentRequired: _defConsentRequired,
         _kFeaturedCategory: _defFeaturedCategory,
         _kHomeStrip: _defHomeStrip,
+        _kUpdateLatestBuild: _defUpdateLatestBuild,
+        _kUpdateMinBuild: _defUpdateMinBuild,
       });
       await rc.fetchAndActivate();
       _rc = rc;
@@ -136,4 +144,14 @@ class RemoteConfigService {
     ];
     return ids;
   }
+
+  /// Builds below this number are offered the update (the `+N` in pubspec,
+  /// Android's versionCode). Set it to the new build once that build is live on
+  /// Play; Play itself still decides whether this device can have it yet.
+  int get updateLatestBuild =>
+      _rc?.getInt(_kUpdateLatestBuild) ?? _defUpdateLatestBuild;
+
+  /// Builds below this number stop at a full-screen "Update required" page.
+  /// For a build found to be broken, not for ordinary releases.
+  int get updateMinBuild => _rc?.getInt(_kUpdateMinBuild) ?? _defUpdateMinBuild;
 }
