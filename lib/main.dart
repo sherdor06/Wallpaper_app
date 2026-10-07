@@ -34,9 +34,15 @@ import 'ui/splash_gate.dart';
 /// A thumbnail that fails to load on a dropped connection reaches this handler
 /// through the image cache. That is weather, not a crash: it is recorded as a
 /// non-fatal so it stays visible without counting against crash-free users.
+///
+/// Matched by the framework's own tag for image loading rather than by
+/// exception type alone: the cache manager fetches through package:http,
+/// whose ClientException is neither a SocketException nor an HttpException.
 void _reportFlutterError(FlutterErrorDetails details) {
   final e = details.exception;
-  if (e is SocketException || e is HttpException) {
+  if (details.library == 'image resource service' ||
+      e is SocketException ||
+      e is HttpException) {
     unawaited(FirebaseCrashlytics.instance.recordFlutterError(details));
     return;
   }
@@ -88,6 +94,12 @@ Future<void> main() async {
           // single crash owner (two native crash handlers would conflict).
           crashReporting: false,
           nativeCrashReporting: false,
+          // The third switch, and the one that mattered: on by default, it
+          // wraps FlutterError.onError and reports every Flutter error to
+          // AppMetrica as an unhandled crash — a thumbnail that failed on a
+          // dropped connection included. That is where the "crashes" from
+          // realme, Infinix and BUZZ phones in Sept 2026 came from.
+          flutterCrashReporting: false,
           logs: kDebugMode,
         ),
       );
