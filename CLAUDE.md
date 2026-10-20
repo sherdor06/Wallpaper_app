@@ -111,6 +111,12 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
   eksport va video kadrlar hammasi shundan; `time` bo'yicha deterministik.
   Android `WorldWallpaperService.kt` shu chizishning native nusxasi — rang
   koeffitsientlari va zarrachalar ikkalasida bir xil tutiladi.
+- Ob-havo sahna yorug'ini ham o'zgartiradi: `WorldWeatherRenderer.grade` —
+  palitradan keyingi rang matritsasi (yomg'ir qoraytiradi, qor oqartiradi,
+  tuman kontrastni tushiradi, bulut soyalaydi); intensivlik 0 da identity.
+  Bulut ikki marta chiziladi: tanasi multiply (soya), cheti screen (yorug');
+  tuman screen + yerdan ko'tariladigan gradient. Yomg'ir 3, qor 4 chuqurlik
+  qavati. Android < 10 da multiply yo'q — bulut soyasi oddiy qatlam.
 - "Jonli" ikki xil, platformaga qarab:
   - **Android** — dunyo *o'zi* wallpaper: `setWorldWallpaper` → tizim
     preview → foydalanuvchi tasdiqlaydi (`supportsLiveWallpaper`).

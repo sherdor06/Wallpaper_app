@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../models/world_composition.dart';
-import 'world_weather.dart';
 import 'world_glass.dart';
+import 'world_weather.dart';
 
 /// The clock repaints only the canvas. No widget builds occur on animation ticks.
 class WorldScene extends StatefulWidget {
@@ -125,28 +125,9 @@ class WorldPainter extends CustomPainter {
       WorldPalette.lavender => [1.06, .91, 1.15],
       WorldPalette.amber => [1.15, 1.01, .8],
     };
-    _imagePaint.colorFilter = ColorFilter.matrix([
-      rgb[0] * factor,
-      0,
-      0,
-      0,
-      0,
-      0,
-      rgb[1] * factor,
-      0,
-      0,
-      0,
-      0,
-      0,
-      rgb[2] * factor,
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-    ]);
+    _imagePaint.colorFilter = ColorFilter.matrix(
+      WorldWeatherRenderer.grade(settings, [for (final c in rgb) c * factor]),
+    );
   }
   final ui.Image image;
   final WorldSettings settings;

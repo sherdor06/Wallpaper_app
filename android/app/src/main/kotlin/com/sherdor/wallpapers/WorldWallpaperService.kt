@@ -128,16 +128,17 @@ class WorldWallpaperService : WallpaperService() {
             speed=value("speed",.35f);drift=value("drift",.4f);zoom=value("zoom",1.055f,1.04f,1.6f)
             focalX=value("focalX",.5f);focalY=value("focalY",.5f);motion=recipe.optBoolean("motion",true)
             if (!motion) time = 0.0
-            val rgb=when(recipe.optString("palette","lavender")) {
+            val palette=recipe.optString("palette","lavender")
+            val rgb=when(palette) {
                 "blue" -> floatArrayOf(.85f,.98f,1.10f)
                 "lavender" -> floatArrayOf(1.06f,.91f,1.15f)
                 "amber" -> floatArrayOf(1.15f,1.01f,.8f)
                 else -> floatArrayOf(1f,1f,1f)
             }
             val brightness=.65f+value("glow",.55f)*.65f
-            imagePaint.colorFilter=ColorMatrixColorFilter(floatArrayOf(
-                rgb[0]*brightness,0f,0f,0f,0f, 0f,rgb[1]*brightness,0f,0f,0f,
-                0f,0f,rgb[2]*brightness,0f,0f, 0f,0f,0f,1f,0f))
+            weatherRenderer.setPalette(palette)
+            imagePaint.colorFilter=ColorMatrixColorFilter(WorldWeatherRenderer.grade(
+                weather, intensity, FloatArray(3) { rgb[it]*brightness }))
         }
         override fun onVisibilityChanged(visible: Boolean) { shown=visible; schedule() }
         override fun onSurfaceCreated(holder: SurfaceHolder) { super.onSurfaceCreated(holder);surfaceReady=true;schedule() }
