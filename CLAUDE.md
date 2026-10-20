@@ -242,6 +242,10 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - Android build: AGP `9.0.1` + Gradle `9.1.0` (Flutter 3.44 shabloni bilan
   bir xil), `android.r8.optimizedResourceShrinking=true`. `builtInKotlin` va
   `newDsl` hozircha `false` — plaginlar KGP qo'llaydi.
+- `MainActivity` bitta Flutter engine'ni keshda saqlaydi
+  (`provideFlutterEngine`): Android 12+ da wallpaper o'rnatilsa tizim ranglari
+  o'zgarib Activity qayta yaratiladi — o'z engine'i bilan Dart holati va
+  `setWallpaper` javobi yo'qolardi. Engine faqat Activity yopilganda o'chadi.
 - `AndroidManifest.xml` izohlarida `--` ishlatilmaydi — XML buni taqiqlaydi va
   Android build butunlay yiqiladi (iOS sezmaydi).
 

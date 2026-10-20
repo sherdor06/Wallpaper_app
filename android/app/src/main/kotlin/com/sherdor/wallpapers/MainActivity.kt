@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -16,6 +17,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import kotlin.math.max
@@ -28,6 +30,25 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         createPushChannel()
+    }
+
+    /**
+     * One engine for the whole process. On Android 12+ a new wallpaper changes the
+     * system colours and the activity is recreated; with its own engine it lost the
+     * Dart state and the reply to setWallpaper.
+     */
+    override fun provideFlutterEngine(context: Context): FlutterEngine {
+        val cache = FlutterEngineCache.getInstance()
+        return cache.get(ENGINE_ID)
+            ?: FlutterEngine(context.applicationContext).also { cache.put(ENGINE_ID, it) }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+            FlutterEngineCache.getInstance().get(ENGINE_ID)?.destroy()
+            FlutterEngineCache.getInstance().remove(ENGINE_ID)
+        }
     }
 
     /**
@@ -251,5 +272,9 @@ class MainActivity : FlutterActivity() {
             hw.contains("goldfish") || hw.contains("ranchu") ||
             model.contains("emulator") || model.contains("android sdk built for") ||
             Build.PRODUCT.lowercase().contains("sdk_gphone")
+    }
+
+    private companion object {
+        const val ENGINE_ID = "main"
     }
 }
