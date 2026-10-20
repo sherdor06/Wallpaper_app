@@ -22,7 +22,6 @@ import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
-import kotlin.math.max
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "wallpaper.channel/setter"
@@ -53,14 +52,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /**
-     * The channel FCM posts push to (see the manifest). High importance is what
-     * lets a notification drop down over the screen; the system default only
-     * puts an icon in the status bar. Creating it again is a no-op, and once it
-     * exists the user owns its settings. The notification prompt only comes
-     * after the app has been opened, so the channel is always here before the
-     * first message can be shown.
-     */
+    /** FCM's default channel (see the manifest). High importance lets a push drop down over the screen. */
     private fun createPushChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
@@ -94,18 +86,14 @@ class MainActivity : FlutterActivity() {
         if (requestCode == WorldWallpaperController.REQUEST) worldWallpaper.onResult(resultCode)
     }
 
-    private fun handleSetWallpaper(
-        call: io.flutter.plugin.common.MethodCall,
-        result: MethodChannel.Result,
-    ) {
+    private fun handleSetWallpaper(call: MethodCall, result: MethodChannel.Result) {
         val path = call.argument<String>("path")
-        val screen = call.argument<String>("screen") // "home" | "lock" | "both"
+        val screen = call.argument<String>("screen")
         if (path.isNullOrEmpty()) {
             result.error("ARG_ERROR", "path is null", null)
             return
         }
 
-        // Optimizatsiya: og'ir ish (4K dekod + setBitmap) UI ip'ida emas, fonda bajariladi.
         Thread {
             try {
                 val metrics = resources.displayMetrics
@@ -123,14 +111,7 @@ class MainActivity : FlutterActivity() {
         }.start()
     }
 
-    /**
-     * Jonli wallpaper: yuklab olingan video yo'lini saqlaydi va tizimning
-     * live-wallpaper preview'ini ochadi (foydalanuvchi u yerda "Set wallpaper" bosadi).
-     */
-    private fun handleSetLiveWallpaper(
-        call: io.flutter.plugin.common.MethodCall,
-        result: MethodChannel.Result,
-    ) {
+    private fun handleSetLiveWallpaper(call: MethodCall, result: MethodChannel.Result) {
         val path = call.argument<String>("path")
         if (path.isNullOrEmpty() || !File(path).exists()) {
             result.error("ARG_ERROR", "video path is missing", null)
@@ -213,26 +194,19 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun applyBitmap(wm: WallpaperManager, bmp: Bitmap, screen: String?) {
-        // FLAG_SYSTEM / FLAG_LOCK API 24+ da ishlaydi. Eski versiyalarda oddiy setBitmap.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            when (screen) {
-                "home" -> wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM)
-                "lock" -> wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_LOCK)
-                else -> {
-                    wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM)
-                    wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_LOCK)
-                }
+        when (screen) {
+            "home" -> wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM)
+            "lock" -> wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_LOCK)
+            else -> {
+                // Two calls, not one with both flags: the lock screen keeps its
+                // own copy, so a later home-only apply leaves it alone.
+                wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM)
+                wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_LOCK)
             }
-        } else {
-            wm.setBitmap(bmp)
         }
     }
 
-    /**
-     * Rasmni xotirani tejagan holda dekod qiladi: avval faqat o'lchamini o'qiydi,
-     * keyin ekranga mos `inSampleSize` bilan kichraytirib yuklaydi. Bu 4K rasmlarda
-     * OutOfMemory'ning oldini oladi.
-     */
+    /** Decodes at the smallest power-of-two size that still covers the screen, so 4K cannot run out of memory. */
     private fun decodeSampledBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, bounds)
@@ -245,24 +219,17 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun calculateInSampleSize(options: BitmapFactory.Options, reqW: Int, reqH: Int): Int {
-        val height = options.outHeight
-        val width = options.outWidth
-        var inSampleSize = 1
-        if (reqW <= 0 || reqH <= 0) return inSampleSize
-        if (height > reqH || width > reqW) {
-            val halfH = height / 2
-            val halfW = width / 2
-            while ((halfH / inSampleSize) >= reqH && (halfW / inSampleSize) >= reqW) {
-                inSampleSize *= 2
-            }
+        var sampleSize = 1
+        if (reqW <= 0 || reqH <= 0) return sampleSize
+        while (options.outWidth / (sampleSize * 2) >= reqW &&
+            options.outHeight / (sampleSize * 2) >= reqH
+        ) {
+            sampleSize *= 2
         }
-        return max(1, inSampleSize)
+        return sampleSize
     }
 
-    /// True on the Android emulator (goldfish / ranchu / generic images).
-    /// Debug-only convenience for the Dart side: the banner is hidden there
-    /// so screens can be looked at without an ad strip. Never consulted in
-    /// release — the Dart caller is behind kDebugMode.
+    // Asked only by debug builds: AdService shows stand-ins on an emulator.
     private fun isEmulator(): Boolean {
         val fp = Build.FINGERPRINT.lowercase()
         val hw = Build.HARDWARE.lowercase()

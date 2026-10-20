@@ -14,7 +14,7 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
-    // Native side of the app's wallpaper channel (matches MainActivity.kt on Android).
+    // Same channel as MainActivity.kt on Android.
     guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WallpaperChannel")
     else { return }
     let channel = FlutterMethodChannel(
@@ -33,25 +33,13 @@ import UIKit
         }
         Self.saveToPhotos(filePath: path, result: result)
       case "isEmulator":
-        // Debug-only convenience for the Dart side: the banner is hidden on
-        // the simulator so screens can be looked at without an ad strip.
-        // Compile-time, so a device build answers false without a lookup.
+        // Asked only by debug builds: AdService shows stand-ins on a simulator.
         #if targetEnvironment(simulator)
         result(true)
         #else
         result(false)
         #endif
-      case "setWallpaper":
-        // iOS does not allow apps to set the wallpaper programmatically.
-        result(FlutterError(code: "NOT_SUPPORTED",
-                            message: "Setting wallpaper is not supported on iOS",
-                            details: nil))
-      case "setLiveWallpaper":
-        result(FlutterError(code: "NOT_IMPLEMENTED",
-                            message: "Live wallpaper coming soon",
-                            details: nil))
-      // Live Photo export for Wavely Worlds — see LivePhotoWriter. The Dart
-      // side renders the frames and streams them here one call at a time.
+      // Wavely Worlds Live Photo: Dart renders the frames and streams them here.
       case "livePhotoBegin":
         guard let args = call.arguments as? [String: Any],
               let width = args["width"] as? Int,
@@ -127,13 +115,8 @@ import UIKit
                         message: message, details: nil))
   }
 
-  /// Saves the image file to the user's photo library (asks for add-only permission).
-  ///
-  /// The catalog serves WebP, which PhotoKit rejects with PHPhotosError 3302 — even
-  /// via `creationRequestForAsset(from:)`. So we decode the file into a UIImage
-  /// (`UIImage(contentsOfFile:)` uses ImageIO, which sniffs the real format from the
-  /// bytes and decodes WebP on iOS 14+), then re-encode it to explicit JPEG data and
-  /// add that resource. That guarantees Photos always receives a supported format.
+  /// Re-encodes to JPEG before saving: PhotoKit rejects the catalog's WebP with
+  /// PHPhotosError 3302, while UIImage decodes it.
   private static func saveToPhotos(filePath: String, result: @escaping FlutterResult) {
     PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
       guard status == .authorized || status == .limited else {
@@ -152,9 +135,6 @@ import UIKit
         }
         return
       }
-      // Re-encode to JPEG so Photos always receives a format it supports. The
-      // catalog serves WebP, which PhotoKit rejects with PHPhotosError 3302 — even
-      // via creationRequestForAsset(from:). Explicit JPEG data avoids that entirely.
       guard let jpeg = image.jpegData(compressionQuality: 0.95) else {
         DispatchQueue.main.async {
           result(FlutterError(code: "ENCODE_FAIL",

@@ -5,13 +5,7 @@ import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import java.io.File
 
-/**
- * Jonli (video) wallpaper servisi: tanlangan videoni fon sifatida cheksiz,
- * ovozsiz aylantiradi. Video yo'li SharedPreferences'da saqlanadi
- * (MainActivity "setLiveWallpaper" chaqiruvida yozadi).
- *
- * Batareya tejash: fon ko'rinmay qolganda (onVisibilityChanged=false) video pauza qilinadi.
- */
+/** Loops the video MainActivity stored in [PREFS], muted, and pauses it while the wallpaper is hidden. */
 class LiveWallpaperService : WallpaperService() {
 
     companion object {
@@ -41,7 +35,6 @@ class LiveWallpaperService : WallpaperService() {
                     setDataSource(path)
                     isLooping = true
                     setVolume(0f, 0f)
-                    // Ekranni to'ldirish (kerak bo'lsa chetlari kesiladi).
                     setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
                     setOnPreparedListener { it.start() }
                     prepareAsync()
@@ -60,7 +53,7 @@ class LiveWallpaperService : WallpaperService() {
                     if (p.isPlaying) p.pause()
                 }
             } catch (_: IllegalStateException) {
-                // Player hali tayyor emas — e'tiborsiz.
+                // Not prepared yet; onPrepared starts it.
             }
         }
 
