@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' show Random;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,12 +11,12 @@ import '../data/wallpaper_repository.dart';
 import '../models/wallpaper.dart';
 import '../services/ad_service.dart';
 import '../services/analytics_service.dart';
+import '../services/deep_link_service.dart';
 import '../services/favorites_service.dart';
 import '../services/history_service.dart';
 import '../services/image_cache.dart';
-import '../services/remote_config_service.dart';
-import '../services/deep_link_service.dart';
 import '../services/push_service.dart';
+import '../services/remote_config_service.dart';
 import '../services/review_service.dart';
 import '../services/unlock_service.dart';
 import '../services/wallpaper_service.dart';
@@ -26,38 +25,24 @@ import 'widgets/badges.dart';
 import 'widgets/floating_chrome.dart';
 
 const _accentDim = Color(0xFF5A4BC8);
-const kAccentLight = Color(0xFF8B7BF0);
 const _success = Color(0xFF7EE2AC);
 const _warning = Color(0xFFF0A35E);
 
-/// What the price chip says.
-///
-/// Deliberately not a duration: the ad SDK reports neither the length of a
-/// loaded ad nor the time left in one, so any number here would be a guess
-/// presented as fact.
-///
-/// Singular, and phrased as the action rather than the ad format ("rewarded
-/// ads" is the industry's name for the category): this chip is a price on one
-/// tap, and a plural would promise a queue of ads that never comes.
+// Not a duration: the ad SDK reports neither an ad's length nor the time left.
 const _chipIdleLabel = 'Watch ad';
 const _chipPlayingLabel = 'Playing';
 
-/// How long the save button holds its terminal states before returning to idle.
 const _doneHold = Duration(milliseconds: 2500);
 const _cancelledHold = Duration(milliseconds: 3000);
 
-
-/// Pixel dimensions implied by a catalog `resolution` label. The catalog stores
-/// only the label (`4K` / `FHD` / `HD`) — no width, height or byte size — so the
-/// badge row derives dimensions here and fetches the size separately.
+// The catalog stores only the resolution label, not the pixel size.
 const _dimensions = <String, String>{
   '4K': '2160 × 3840',
   'FHD': '1080 × 1920',
   'HD': '720 × 1280',
 };
 
-/// The save control's five states. `locked` doubles as the idle state: when the
-/// wallpaper is not gated it simply renders without the price chip.
+/// `locked` doubles as idle: an ungated wallpaper simply shows no price chip.
 enum _SaveState { locked, watching, downloading, done, cancelled }
 
 class DetailPage extends StatefulWidget {
@@ -71,65 +56,54 @@ class DetailPage extends StatefulWidget {
 
 class _DetailPageState extends State<DetailPage> {
   bool _busy = false;
-  /// Download progress, held outside setState on purpose.
-  ///
-  /// Dio reports progress many times a second. Routing that through setState
-  /// rebuilt this entire page — the full-bleed 4K image, every badge, both
-  /// button stacks — for a number that only two small widgets read. A notifier
-  /// keeps the ticks where they belong: the fill bar and the percentage repaint,
-  /// nothing else does.
+  // Outside setState: Dio reports progress many times a second, and only the
+  // fill bar and the percentage read it.
   final ValueNotifier<double> _progress = ValueNotifier<double>(0);
   final Random _rng = Random();
-
-  /// Immersive preview: tapping the image hides all chrome and the system bars
-  /// so the wallpaper is shown full-screen. Tapping again restores them.
   bool _immersive = false;
-
   _SaveState _saveState = _SaveState.locked;
-
-  /// Returns [_SaveState.done] / [_SaveState.cancelled] to idle after their hold.
   Timer? _holdTimer;
-
-  /// Byte size of the full-resolution file, once a HEAD request resolves it.
-  /// Null until then (and if the request fails) — the badge row omits the size
-  /// rather than guessing.
   int? _fileBytes;
-
-  /// Which screen the last Android apply targeted, so the done sub-line can
-  /// name it back to the user. Null only until the first apply of the session.
   WallpaperTarget? _activeTarget;
 
   Wallpaper get _w => widget.wallpaper;
 
-  /// Whether the rewarded gate applies to this wallpaper at all, regardless of
-  /// whether it has already been unlocked. Each tier has its own Remote Config
-  /// flag (`rewarded_required_for_4k` / `_fhd`); turning one off makes that tier
-  /// free. Everything that mentions the ad to the user hangs off this.
   bool get _gated {
-    // Nothing to charge with while the ad SDK has no credentials (or ads are
-    // switched off): `showRewardedToUnlock` grants the unlock immediately in
-    // that state, so the gate would announce a cost it never collects. Dropping
-    // it here removes the whole affordance at once — the "Watch ad" chip, the
-    // "Playing" state, the pause before the download, and the "unlocked" badge.
+    // Without ad credentials the unlock is granted at once, so the gate would
+    // announce a cost it never collects.
     if (!AdService.instance.rewardedAvailable) return false;
     final rc = RemoteConfigService.instance;
     return (_w.is4k && rc.rewardedRequiredFor4k) ||
         (_w.isFhd && rc.rewardedRequiredForFhd);
   }
 
-  /// A gated wallpaper the user hasn't paid for yet — a rewarded ad comes first.
   bool get _locked => _gated && !UnlockService.instance.isUnlocked(_w.id);
 
-  /// Shares a link to this wallpaper.
-  ///
-  /// Sends the URL, not the image file. A file lands in the friend's gallery
-  /// and ends there; a link opens this wallpaper in their copy of the app, or
-  /// sends them to the store to get one — which is the only version of sharing
-  /// that brings anyone back.
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.logWallpaperView(_w.id, category: _w.category);
+    unawaited(_fetchFileSize());
+  }
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    _progress.dispose();
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    super.dispose();
+  }
+
+  Future<void> _fetchFileSize() async {
+    final bytes = await WallpaperService.instance.fileSize(_w.fullUrl);
+    if (bytes != null && mounted) setState(() => _fileBytes = bytes);
+  }
+
+  /// Shares a link rather than the file: a link opens the wallpaper in the
+  /// friend's app, or sends them to the store.
   Future<void> _share() async {
     final url = DeepLinkService.shareUrlFor(_w.id);
-    // The sheet wants an origin rect on iPad or it throws; on a phone the
-    // button's own box is the natural anchor.
+    // iPad throws without an origin rect.
     final box = context.findRenderObject() as RenderBox?;
     await SharePlus.instance.share(
       ShareParams(
@@ -142,13 +116,48 @@ class _DetailPageState extends State<DetailPage> {
     AnalyticsService.logShare(_w.id);
   }
 
-  /// Ensures a gated wallpaper is unlocked (via a rewarded ad) before
-  /// proceeding. Grants access when ads are unavailable, so a missing or failed
-  /// ad never blocks the user.
-  ///
-  /// Drives the save control through [_SaveState.watching] and reports whether
-  /// the action may continue. The refusal is rendered in the panel — the button
-  /// itself says the video wasn't finished — so nothing is surfaced as a snack.
+  Future<void> _openRandom() async {
+    final all = (await WallpaperRepository.instance.fetchCatalog()).wallpapers;
+    if (all.length < 2) return;
+    var next = _w;
+    while (next.id == _w.id) {
+      next = all[_rng.nextInt(all.length)];
+    }
+    // The least intrusive interstitial slot: the screen changes anyway.
+    await AdService.instance.maybeShowInterstitialOnBrowse();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (_, __, ___) => DetailPage(wallpaper: next),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
+    );
+  }
+
+  void _toggleImmersive() {
+    setState(() => _immersive = !_immersive);
+    unawaited(
+      SystemChrome.setEnabledSystemUIMode(
+        _immersive ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+      ),
+    );
+  }
+
+  void _setSaveState(_SaveState next, {Duration? revertAfter}) {
+    if (!mounted) return;
+    _holdTimer?.cancel();
+    setState(() => _saveState = next);
+    if (revertAfter != null) {
+      _holdTimer = Timer(revertAfter, () {
+        if (mounted) setState(() => _saveState = _SaveState.locked);
+      });
+    }
+  }
+
+  /// Plays the rewarded ad for a locked wallpaper. False when it was not
+  /// finished; a missing or failed ad never blocks the user.
   Future<bool> _ensureUnlocked() async {
     if (!_locked) return true;
     _setSaveState(_SaveState.watching);
@@ -163,248 +172,106 @@ class _DetailPageState extends State<DetailPage> {
     return false;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    AnalyticsService.logWallpaperView(_w.id, category: _w.category);
-    unawaited(_fetchFileSize());
-  }
-
-  @override
-  void dispose() {
-    _holdTimer?.cancel();
-    _progress.dispose();
-    // Restore the system bars when leaving the preview.
-    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
-    super.dispose();
-  }
-
-  /// Reads the full-resolution file's size from its `Content-Length`. The
-  /// catalog carries no size field, and a HEAD costs one small round trip, so
-  /// the badge row can show a real number instead of an estimate. Failure is
-  /// silent — [_fileBytes] stays null and the badge drops the size.
-  Future<void> _fetchFileSize() async {
-    try {
-      final res = await Dio().head<void>(_w.fullUrl);
-      final len = int.tryParse(res.headers.value('content-length') ?? '');
-      if (len != null && len > 0 && mounted) setState(() => _fileBytes = len);
-    } catch (_) {
-      // Offline or the CDN withheld the header — leave it unknown.
-    }
-  }
-
-  /// Moves the save control to [next], cancelling whatever hold was pending.
-  /// [revertAfter] schedules the return to idle for the terminal states.
-  void _setSaveState(_SaveState next, {Duration? revertAfter}) {
-    if (!mounted) return;
-    _holdTimer?.cancel();
-    setState(() => _saveState = next);
-    if (revertAfter != null) {
-      _holdTimer = Timer(revertAfter, () {
-        if (mounted) setState(() => _saveState = _SaveState.locked);
-      });
-    }
-  }
-
-  void _toggleImmersive() {
-    setState(() => _immersive = !_immersive);
-    unawaited(
-      SystemChrome.setEnabledSystemUIMode(
-        _immersive ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
-      ),
-    );
-  }
-
-  /// Human-readable name of the screen a wallpaper is applied to (Android).
-  static String _targetName(WallpaperTarget target) {
-    switch (target) {
-      case WallpaperTarget.home:
-        return 'Home screen';
-      case WallpaperTarget.lock:
-        return 'Lock screen';
-      case WallpaperTarget.both:
-        return 'Home and Lock screens';
-    }
-  }
-
-  /// Opens a random wallpaper from the catalog, replacing the current page so
-  /// the back stack stays shallow. A gentle cross-fade keeps it polished.
-  Future<void> _openRandom() async {
-    final all = (await WallpaperRepository.instance.fetchCatalog()).wallpapers;
-    if (all.length < 2) return;
-    var next = _w;
-    while (next.id == _w.id) {
-      next = all[_rng.nextInt(all.length)];
-    }
-    // Shuffling is the app's tightest loop and the screen is about to change
-    // anyway, which makes this the least intrusive interstitial slot — and the
-    // one that keeps the format earning now that almost every wallpaper is
-    // rewarded-gated (the apply path alone fires far too rarely).
-    await AdService.instance.maybeShowInterstitialOnBrowse();
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 300),
-        pageBuilder: (_, __, ___) => DetailPage(wallpaper: next),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
-    );
-  }
-
-  /// Applies the wallpaper. The target sheet already named the screen and is
-  /// dismissible, so there is no second confirmation dialog here.
-  Future<void> _applyImage(WallpaperTarget target) async {
-    if (!await _ensureUnlocked()) return;
-    // The unlock above can hold a full-screen rewarded ad for half a minute,
-    // and the user is free to leave during it. Touching state after that would
-    // be setState() on a disposed widget.
-    if (!mounted) return;
-    _setSaveState(_SaveState.downloading);
-    setState(() {
-      _busy = true;
-      _progress.value = 0;
-      _activeTarget = target; // the fill runs in the button that was tapped
-    });
-    try {
-      await WallpaperService.instance.setImageWallpaper(
-        _w,
-        target: target,
-        onProgress: (p) {
-          // Still guarded: the download outlives the page if the user backs out
-          // mid-transfer, and writing to a disposed notifier throws.
-          if (mounted) _progress.value = p;
-        },
-      );
-      AnalyticsService.logWallpaperSet(_w.id, target: target.value);
-      unawaited(HistoryService.instance.add(_w.id));
-      // The one moment the app has clearly been useful — which is the only
-      // moment worth spending Android's single notification prompt on.
-      unawaited(PushService.instance.maybeAskPermission());
-      // Unconditional: AdService's shared full-screen cooldown suppresses this
-      // when the unlock above just played a rewarded ad, so there is no need to
-      // gate it on the wallpaper having been unlocked.
-      final adPlayed = await AdService.instance.maybeShowInterstitial();
-      _setSaveState(_SaveState.done, revertAfter: _doneHold);
-      if (!adPlayed) unawaited(ReviewService.instance.maybeAsk());
-    } on PlatformException catch (e) {
-      _setSaveState(_SaveState.locked);
-      _snack('Error: ${e.message}');
-    } catch (_) {
-      _setSaveState(_SaveState.locked);
-      _snack('Something went wrong');
-    } finally {
-      // _activeTarget deliberately survives this block: the done sub-line names
-      // the screen back to the user, and that line is still on show for
-      // [_doneHold] after the apply returns. Clearing it here made every apply
-      // read "Applied to your home screen" regardless of what was picked. The
-      // next apply overwrites it, and no other state reads it.
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _downloadToGallery() async {
-    if (!await _ensureUnlocked()) return;
-    if (!mounted) return; // see _applyImage — the ad gives the user time to leave
+  /// Unlocks, then marks the page busy. False when the ad was not finished,
+  /// or the user left the page while it played.
+  Future<bool> _begin({bool panel = false}) async {
+    if (!await _ensureUnlocked() || !mounted) return false;
+    if (panel) _setSaveState(_SaveState.downloading);
     setState(() {
       _busy = true;
       _progress.value = 0;
     });
-    try {
-      await WallpaperService.instance.downloadToGallery(
-        _w,
-        onProgress: (p) {
-          // Still guarded: the download outlives the page if the user backs out
-          // mid-transfer, and writing to a disposed notifier throws.
-          if (mounted) _progress.value = p;
-        },
-      );
-      AnalyticsService.logWallpaperDownload(_w.id);
-      unawaited(HistoryService.instance.add(_w.id));
-      unawaited(PushService.instance.maybeAskPermission());
-      final adPlayed = await AdService.instance.maybeShowInterstitial();
-      _snack('Saved to gallery');
-      if (!adPlayed) unawaited(ReviewService.instance.maybeAsk());
-    } catch (_) {
-      _snack('Couldn\'t save');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    return true;
   }
 
-  /// iOS main action: save to Photos.
-  ///
-  /// No confirmation step — the button already states what it will do and what
-  /// it costs, and the panel spells out the Photos → Share route once the file
-  /// has landed. A dialog in between only asked the user to agree twice.
-  Future<void> _saveToPhotos() async {
-    if (!await _ensureUnlocked()) return;
-    if (!mounted) return; // see _applyImage — the ad gives the user time to leave
-    _setSaveState(_SaveState.downloading);
-    setState(() {
-      _busy = true;
-      _progress.value = 0;
-    });
+  void _end() {
+    if (mounted) setState(() => _busy = false);
+  }
+
+  // The download outlives the page, and a disposed notifier throws.
+  void _onProgress(double value) {
+    if (mounted) _progress.value = value;
+  }
+
+  /// Runs an apply or a save, then what follows one: history, the
+  /// notification prompt, a possible interstitial and the review sheet. With
+  /// [panel] the save control reports the outcome; otherwise [doneSnack] does.
+  Future<void> _runSave(
+    Future<void> Function() job, {
+    bool panel = false,
+    String? doneSnack,
+    required String failSnack,
+  }) async {
+    if (!await _begin(panel: panel)) return;
     try {
-      await WallpaperService.instance.downloadToGallery(
-        _w,
-        onProgress: (p) {
-          // Still guarded: the download outlives the page if the user backs out
-          // mid-transfer, and writing to a disposed notifier throws.
-          if (mounted) _progress.value = p;
-        },
-      );
-      AnalyticsService.logWallpaperDownload(_w.id);
+      await job();
       unawaited(HistoryService.instance.add(_w.id));
-      // iOS's main action, so this is the only place an iPhone user reaches
-      // the prompt without going to Settings.
       unawaited(PushService.instance.maybeAskPermission());
       final adPlayed = await AdService.instance.maybeShowInterstitial();
-      // Success is reported inside the panel, not as a snack.
-      _setSaveState(_SaveState.done, revertAfter: _doneHold);
+      if (panel) {
+        _setSaveState(_SaveState.done, revertAfter: _doneHold);
+      } else if (doneSnack != null) {
+        _snack(doneSnack);
+      }
       if (!adPlayed) unawaited(ReviewService.instance.maybeAsk());
-    } on PlatformException catch (e) {
-      // Real errors still snack — the panel only speaks about the ad/save flow.
-      _setSaveState(_SaveState.locked);
-      _snack(e.code == 'PERMISSION_DENIED'
-          ? 'Allow Photos access in Settings to save'
-          : 'Save failed: ${e.message ?? e.code}');
     } catch (e) {
-      _setSaveState(_SaveState.locked);
-      _snack('Save failed: $e');
+      if (panel) _setSaveState(_SaveState.locked);
+      _snack(
+        e is PlatformException && e.code == 'PERMISSION_DENIED'
+            ? 'Allow photo access in Settings to save'
+            : failSnack,
+      );
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _end();
     }
   }
 
+  Future<void> _applyImage(WallpaperTarget target) {
+    _activeTarget = target;
+    return _runSave(
+      () async {
+        await WallpaperService.instance.setImageWallpaper(
+          _w,
+          target: target,
+          onProgress: _onProgress,
+        );
+        AnalyticsService.logWallpaperSet(_w.id, target: target.name);
+      },
+      panel: true,
+      failSnack: "Couldn't set the wallpaper",
+    );
+  }
+
+  Future<void> _saveToGallery({bool panel = false}) => _runSave(
+        () async {
+          await WallpaperService.instance.downloadToGallery(
+            _w,
+            onProgress: _onProgress,
+          );
+          AnalyticsService.logWallpaperDownload(_w.id);
+        },
+        panel: panel,
+        doneSnack: 'Saved to gallery',
+        failSnack: "Couldn't save",
+      );
+
+  Future<void> _saveToPhotos() => _saveToGallery(panel: true);
+
+  // No interstitial or prompts here: the system preview is already on top.
   Future<void> _applyLive() async {
-    if (!await _ensureUnlocked()) return;
-    if (!mounted) return; // see _applyImage — the ad gives the user time to leave
-    setState(() {
-      _busy = true;
-      _progress.value = 0;
-    });
+    if (!await _begin()) return;
     try {
       await WallpaperService.instance.setLiveWallpaper(
         _w,
-        onProgress: (p) {
-          // Still guarded: the download outlives the page if the user backs out
-          // mid-transfer, and writing to a disposed notifier throws.
-          if (mounted) _progress.value = p;
-        },
+        onProgress: _onProgress,
       );
       AnalyticsService.logWallpaperSet(_w.id, target: 'live');
       unawaited(HistoryService.instance.add(_w.id));
-      // The system live-wallpaper preview opens; the user confirms there.
       _snack('Tap "Set wallpaper" in the preview');
-    } on PlatformException catch (e) {
-      _snack(e.code == 'NOT_IMPLEMENTED'
-          ? 'Live wallpaper is Android-only for now'
-          : 'Couldn\'t set live wallpaper');
     } catch (_) {
-      _snack('Couldn\'t set live wallpaper');
+      _snack("Couldn't set live wallpaper");
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _end();
     }
   }
 
@@ -413,11 +280,16 @@ class _DetailPageState extends State<DetailPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  static String _targetName(WallpaperTarget target) => switch (target) {
+        WallpaperTarget.home => 'Home screen',
+        WallpaperTarget.lock => 'Lock screen',
+        WallpaperTarget.both => 'Home and Lock screens',
+      };
+
   @override
   Widget build(BuildContext context) {
     const fade = Duration(milliseconds: 200);
-    // Decode the preview only at screen resolution, not full 4K — this keeps
-    // memory low and avoids OOM crashes on very large wallpapers.
+    // Decoded at screen resolution, not full 4K, to keep memory low.
     final decodeWidth = (MediaQuery.sizeOf(context).width *
             MediaQuery.devicePixelRatioOf(context))
         .round()
@@ -426,7 +298,6 @@ class _DetailPageState extends State<DetailPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Wallpaper image — tap toggles the immersive (chrome-free) preview.
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: _toggleImmersive,
@@ -443,8 +314,6 @@ class _DetailPageState extends State<DetailPage> {
               ),
             ),
           ),
-
-          // Top bar (back / title / download / favorite) — fades out in preview.
           Positioned(
             top: 0,
             left: 0,
@@ -458,8 +327,6 @@ class _DetailPageState extends State<DetailPage> {
               ),
             ),
           ),
-
-          // Bottom control panel — fades out in preview.
           Align(
             alignment: Alignment.bottomCenter,
             child: IgnorePointer(
@@ -471,11 +338,7 @@ class _DetailPageState extends State<DetailPage> {
               ),
             ),
           ),
-
-          // Random-wallpaper button — pinned to a fixed spot so it never shifts
-          // when the panel below changes height between wallpapers (4K hint,
-          // progress bar, live vs image buttons). Thumb-friendly on the right;
-          // liquid glass on iOS, simple solid circle on Android.
+          // Pinned, so it never moves when the panel changes height.
           Positioned(
             right: 20,
             bottom: MediaQuery.paddingOf(context).bottom + 224,
@@ -491,7 +354,6 @@ class _DetailPageState extends State<DetailPage> {
                   iconSize: 28,
                   onTap: () {
                     if (_busy) return;
-                    // Tactile + audible feedback on press.
                     unawaited(HapticFeedback.selectionClick());
                     unawaited(SystemSound.play(SystemSoundType.click));
                     unawaited(_openRandom());
@@ -505,8 +367,6 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
-  /// Transparent top bar over the wallpaper (replaces the Scaffold AppBar so it
-  /// can fade in/out with the immersive preview).
   Widget _buildTopBar() {
     return Container(
       decoration: const BoxDecoration(
@@ -546,7 +406,7 @@ class _DetailPageState extends State<DetailPage> {
               IconButton(
                 tooltip: 'Download',
                 icon: const Icon(Icons.download, color: Colors.white),
-                onPressed: _busy ? null : _downloadToGallery,
+                onPressed: _busy ? null : _saveToGallery,
               ),
               ListenableBuilder(
                 listenable: FavoritesService.instance,
@@ -570,7 +430,6 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildControls() {
-    // Subtle gradient scrim for legibility over the wallpaper (not glass).
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -594,27 +453,24 @@ class _DetailPageState extends State<DetailPage> {
                 child: FilledButton.icon(
                   onPressed: _busy ? null : _applyLive,
                   icon: const Icon(Icons.play_circle_fill),
-                  label: Text(_busy ? 'Loading...' : 'Set live wallpaper'),
+                  label: Text(_busy ? 'Loading…' : 'Set live wallpaper'),
                 ),
               )
             else if (defaultTargetPlatform == TargetPlatform.iOS)
-              // iOS can't set the wallpaper programmatically — offer Save to Photos.
+              // iOS apps cannot set the wallpaper.
               _buildSaveButton(
                 idleLabel: 'Save to Photos',
                 doneLabel: 'Saved to Photos',
                 onTap: _saveToPhotos,
               )
             else
-              // Android takes the same single control; which screen it applies
-              // to is asked in a sheet instead of spending three buttons on it.
               _buildSaveButton(
                 idleLabel: 'Set as wallpaper',
                 doneLabel: 'Wallpaper set',
                 onTap: _pickTargetAndApply,
               ),
             const SizedBox(height: 11),
-            // Always rendered, so the panel height never moves between states —
-            // the shuffle FAB above it must stay put.
+            // Always rendered: the panel keeps one height in every state.
             _buildSubLine(),
           ],
         ),
@@ -622,9 +478,8 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
-  /// Resolution / dimensions / size. The first badge turns into a `… unlocked`
-  /// confirmation while the file downloads — but only where an unlock was ever
-  /// required, otherwise it would celebrate passing a gate that wasn't there.
+  /// The first badge confirms the unlock while the file downloads, but only
+  /// where there was a gate to pass.
   Widget _buildBadgeRow() {
     final unlockedNow = _gated &&
         (_saveState == _SaveState.downloading ||
@@ -659,9 +514,8 @@ class _DetailPageState extends State<DetailPage> {
     return '${(bytes / 1024).round()} KB';
   }
 
-  /// The single glass action control, used on both platforms. The frame is
-  /// built once and only its interior cross-fades, so the button cannot resize
-  /// as states change.
+  /// The frame is built once and only its interior cross-fades, so the button
+  /// never resizes between states.
   Widget _buildSaveButton({
     required String idleLabel,
     required String doneLabel,
@@ -715,19 +569,15 @@ class _DetailPageState extends State<DetailPage> {
             ),
             child: Stack(
               children: [
-                // Progress runs behind the interior, clipped to the frame.
                 if (_saveState == _SaveState.downloading)
                   Positioned.fill(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
                       child: ValueListenableBuilder<double>(
                         valueListenable: _progress,
-                        // The gradient never changes, so it is built once and
-                        // handed through as the unchanging child.
                         child: Container(
                           decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                                colors: [kAccent, kAccentLight]),
+                            gradient: kAccentGradient,
                           ),
                         ),
                         builder: (context, value, child) =>
@@ -835,8 +685,6 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
-  /// The price chip: what the wallpaper costs, stated once. Absent entirely once
-  /// the wallpaper is unlocked — no ad affordance survives the unlock.
   Widget? _saveChip() {
     if (_saveState == _SaveState.watching) {
       return _chipBox(
@@ -883,9 +731,6 @@ class _DetailPageState extends State<DetailPage> {
             color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
       );
 
-  /// Asks which screen to apply to, then applies. The sheet names the target
-  /// explicitly, so it stands in for the old confirmation dialog rather than
-  /// being followed by one.
   Future<void> _pickTargetAndApply() async {
     final target = await showModalBottomSheet<WallpaperTarget>(
       context: context,
@@ -919,18 +764,14 @@ class _DetailPageState extends State<DetailPage> {
               style: Theme.of(ctx).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
-            for (final (target, icon, label) in const [
-              (WallpaperTarget.home, Icons.home_rounded, 'Home screen'),
-              (WallpaperTarget.lock, Icons.lock_rounded, 'Lock screen'),
-              (
-                WallpaperTarget.both,
-                Icons.smartphone_rounded,
-                'Home and Lock screens'
-              ),
+            for (final (target, icon) in const [
+              (WallpaperTarget.home, Icons.home_rounded),
+              (WallpaperTarget.lock, Icons.lock_rounded),
+              (WallpaperTarget.both, Icons.smartphone_rounded),
             ])
               ListTile(
                 leading: Icon(icon),
-                title: Text(label),
+                title: Text(_targetName(target)),
                 onTap: () => Navigator.of(ctx).pop(target),
               ),
             const SizedBox(height: 8),
@@ -942,8 +783,6 @@ class _DetailPageState extends State<DetailPage> {
     await _applyImage(target);
   }
 
-  /// One line under the button. Always present — only its text changes — so the
-  /// panel keeps a fixed height across every state.
   Widget _buildSubLine() {
     late final String text;
     late final Color color;
@@ -980,12 +819,6 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
-  /// The line shown before the tap and while the file transfers.
-  ///
-  /// The two platforms promise different things and cannot share one sentence:
-  /// iOS puts a file in Photos, Android writes the wallpaper itself onto a
-  /// screen the target sheet asks about. Both keep "full resolution" — that is
-  /// the part the user is deciding on.
   String _restingSubLine() {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return 'Saved at full resolution to your Photos';
@@ -999,8 +832,8 @@ class _DetailPageState extends State<DetailPage> {
   }
 }
 
-/// Badge used in the detail panel. Unlike [WallpaperBadge] it can switch to a
-/// success treatment, which the row uses to confirm the unlock in place.
+/// Unlike [WallpaperBadge], it can switch to a success look to confirm the
+/// unlock in place.
 class _PanelBadge extends StatelessWidget {
   final String label;
   final bool highlight;
@@ -1031,5 +864,3 @@ class _PanelBadge extends StatelessWidget {
     );
   }
 }
-
-

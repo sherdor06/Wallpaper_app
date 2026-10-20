@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -18,6 +19,7 @@ import android.provider.MediaStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import kotlin.math.max
@@ -152,15 +154,8 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /**
-     * Yuklab olingan rasmni qurilma galereyasiga (Pictures/Wallpapers) saqlaydi.
-     * Android 10+ (API 29+) da MediaStore RELATIVE_PATH ishlatiladi — runtime ruxsat
-     * shart emas. Og'ir I/O fonda bajariladi.
-     */
-    private fun handleSaveToGallery(
-        call: io.flutter.plugin.common.MethodCall,
-        result: MethodChannel.Result,
-    ) {
+    /** Copies the image into Pictures/Wallpapers. Below Android 10 the Dart side asks for storage first. */
+    private fun handleSaveToGallery(call: MethodCall, result: MethodChannel.Result) {
         val path = call.argument<String>("path")
         if (path.isNullOrEmpty()) {
             result.error("ARG_ERROR", "path is null", null)
@@ -168,16 +163,18 @@ class MainActivity : FlutterActivity() {
         }
 
         Thread {
+            val resolver = applicationContext.contentResolver
+            var uri: Uri? = null
             try {
                 val src = File(path)
-                val png = path.endsWith(".png", ignoreCase = true)
-                val extension = if (png) "png" else "jpg"
-                val name = "wallpaper_${System.currentTimeMillis()}.$extension"
-                val resolver = applicationContext.contentResolver
-
+                val (extension, mime) = when (src.extension.lowercase()) {
+                    "png" -> "png" to "image/png"
+                    "webp" -> "webp" to "image/webp"
+                    else -> "jpg" to "image/jpeg"
+                }
                 val values = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, name)
-                    put(MediaStore.Images.Media.MIME_TYPE, if (png) "image/png" else "image/jpeg")
+                    put(MediaStore.Images.Media.DISPLAY_NAME, "wallpaper_${System.currentTimeMillis()}.$extension")
+                    put(MediaStore.Images.Media.MIME_TYPE, mime)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         put(
                             MediaStore.Images.Media.RELATIVE_PATH,
@@ -193,21 +190,23 @@ class MainActivity : FlutterActivity() {
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                 }
 
-                val uri = resolver.insert(collection, values)
+                val target = resolver.insert(collection, values)
                     ?: throw IllegalStateException("MediaStore insert failed")
-                resolver.openOutputStream(uri).use { out ->
-                    src.inputStream().use { input -> input.copyTo(out!!) }
-                }
+                uri = target
+                val out = resolver.openOutputStream(target)
+                    ?: throw IllegalStateException("MediaStore stream failed")
+                out.use { src.inputStream().use { input -> input.copyTo(it) } }
 
-                // Android 10+ da faylni "tayyor" deb belgilash.
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     values.clear()
                     values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                    resolver.update(uri, values, null, null)
+                    resolver.update(target, values, null, null)
                 }
 
                 mainHandler.post { result.success(true) }
             } catch (e: Exception) {
+                // Leave no half-written entry in the gallery.
+                uri?.let { runCatching { resolver.delete(it, null, null) } }
                 mainHandler.post { result.error("SAVE_FAIL", e.message, null) }
             }
         }.start()

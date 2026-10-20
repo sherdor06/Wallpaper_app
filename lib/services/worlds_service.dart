@@ -8,11 +8,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../models/world_composition.dart';
-import '../ui/worlds/world_weather.dart';
 import '../ui/worlds/world_scene.dart' show exportSize, renderWorld, worldClock;
+import '../ui/worlds/world_weather.dart';
+import 'wallpaper_service.dart';
 
 /// Private, offline scene library. Imports are copied out of picker caches;
 /// native wallpapers own another copy so deleting a draft cannot break one.
@@ -348,22 +348,9 @@ class WorldsService extends ChangeNotifier {
   }
 
   Future<void> saveStill(Uint8List bytes) async {
-    if (Platform.isAndroid &&
-        (await _channel.invokeMethod<bool>('needsGalleryPermission') ??
-            false)) {
-      if (!await Permission.storage.request().isGranted) {
-        throw PlatformException(
-          code: 'PERMISSION_DENIED',
-          message: 'Allow photo access in Settings to save this wallpaper.',
-        );
-      }
-    }
     final file = await writeExport(bytes);
     try {
-      final saved = await _channel.invokeMethod<bool>('saveImageToGallery', {
-        'path': file.path,
-      });
-      if (saved != true) throw StateError('The image was not saved.');
+      await WallpaperService.instance.saveFileToGallery(file.path);
     } finally {
       await file.delete();
     }
