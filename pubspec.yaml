@@ -61,7 +61,7 @@ dependencies:
   firebase_remote_config: ^6.5.4
   # Still pinned exactly, but the original reason is gone: the pin existed to
   # satisfy the AppLovin Yandex adapter's `AppMetricaLibraryAdapter ~> 6.5.0`,
-  # and that adapter left with AppLovin. YandexMobileAds 8.4.0 now pulls the
+  # and that adapter left with AppLovin. YandexMobileAds now pulls the
   # adapter directly and may want a newer floor than 4.0.0 provides. Android
   # resolves this on its own (Gradle takes the highest version in range); if
   # CocoaPods ever refuses to install, bump this to 4.1.0 rather than fighting
@@ -73,7 +73,7 @@ dependencies:
   # because its publisher account never opened. AdService keeps a
   # network-agnostic public surface, so putting mediation back later is a
   # change to that one file, not to the UI.
-  yandex_mobileads: ^8.4.0
+  yandex_mobileads: ^8.6.0
   share_plus: ^12.0.2
   app_links: ^7.2.1
   firebase_messaging: ^16.6.0
@@ -124,13 +124,10 @@ flutter_native_splash:
 flutter:
 
   # iOS plugins go through CocoaPods only, for this project alone (the global
-  # Flutter setting stays on). yandex_mobileads has no Swift Package Manager
-  # support, so it is always a pod — and its YandexMobileAds pod pulls
-  # AppMetricaCrashes -> KSCrash. With SPM on, appmetrica_plugin brought a
-  # second KSCrash through SPM, the two resolvers never saw each other, and the
-  # link failed on 2183 duplicate symbols. One resolver means one KSCrash.
-  # Revisit once yandex_mobileads ships a Package.swift — Flutter has said
-  # opting out will eventually stop being allowed.
+  # Flutter setting stays on): with SPM on, KSCrash came in through both
+  # resolvers and the link failed on 2183 duplicate symbols. yandex_mobileads
+  # 8.6.0 ships a Package.swift, so SPM can return once a build links cleanly,
+  # before Firebase stops publishing pods after October 2026.
   config:
     enable-swift-package-manager: false
 
