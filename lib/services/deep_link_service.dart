@@ -4,106 +4,73 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 
 import '../data/wallpaper_repository.dart';
-import '../models/wallpaper.dart';
-import 'update_service.dart';
 import '../ui/detail_page.dart';
+import '../ui/home/collection_page.dart';
+import 'update_service.dart';
 
-/// Turns a shared wallpaper link into an open detail page.
+/// Opens the wallpaper (`/w/<id>`) or collection (`/c/<id>`) a link points at.
 ///
-/// The link is a plain https URL on the CDN's own domain
-/// (`https://<host>/w/<id>`), which is what makes the two halves of sharing
-/// work from a single string:
-///
-///  * With the app installed, Android App Links hands the URL straight to us —
-///    the friend lands on the wallpaper, no browser, no chooser. That requires
-///    the domain to vouch for the app in `.well-known/assetlinks.json`; without
-///    it Android falls back to asking, which still works but is uglier.
-///  * Without the app, it is an ordinary web page, and the page sends them to
-///    the Play Store.
-///
-/// A custom scheme (`wavely://`) would have been less work and strictly worse:
-/// it does nothing at all for someone who has not installed the app, which is
-/// exactly the person a share is trying to reach.
+/// Links are plain https URLs on the CDN's domain, not a custom scheme: with
+/// the app installed Android App Links opens them here, and without it they
+/// are a web page that leads to the store. Only `/w/` is in the intent filter
+/// and on the site; `/c/` arrives from notifications alone.
 class DeepLinkService {
   DeepLinkService._();
   static final DeepLinkService instance = DeepLinkService._();
 
-  /// Host and path the share links live on. Must match the intent filter in
-  /// AndroidManifest.xml and the `_redirects` rule on the site.
+  // Must match the intent filter in AndroidManifest.xml and `_redirects`.
   static const _host = 'wallpapers-cdn.pages.dev';
-  static const _pathPrefix = '/w/';
+  static const _wallpaperPrefix = '/w/';
+  static const _collectionPrefix = '/c/';
 
   final AppLinks _appLinks = AppLinks();
-  // Deliberately never cancelled: links can arrive at any moment the app is
-  // alive, and [init] only ever subscribes once (`??=`), so there is nothing
-  // to leak and no point at which listening should stop.
+  // Never cancelled: links can arrive whenever the app is alive.
   // ignore: cancel_subscriptions
   StreamSubscription<Uri>? _sub;
   GlobalKey<NavigatorState>? _navigator;
 
-  /// A link that arrived before [init] had a navigator to push on — a
-  /// notification tapped on a cold start is read before `runApp`. Replayed
-  /// by [init] rather than dropped.
+  // A notification tapped on a cold start is read before `runApp`, when there
+  // is no navigator yet. [init] replays it.
   Uri? _pending;
 
-  /// The URL to share for [wallpaperId].
-  ///
-  /// Ids carry a slash (`nature/tg_18493`) and become path segments, so the
-  /// result reads as a normal nested URL rather than something escaped.
   static Uri shareUrlFor(String wallpaperId) =>
-      Uri.parse('https://$_host$_pathPrefix$wallpaperId');
+      Uri.parse('https://$_host$_wallpaperPrefix$wallpaperId');
 
-  /// Extracts a wallpaper id from an incoming link, or null if it is not one of
-  /// ours. Deliberately strict about host and prefix: anything else reaching
-  /// this app is not a link we published.
-  static String? wallpaperIdFrom(Uri uri) {
-    if (uri.host != _host) return null;
-    if (!uri.path.startsWith(_pathPrefix)) return null;
-    final id = uri.path.substring(_pathPrefix.length);
+  // Strict about host and prefix: anything else is not a link we published.
+  static String? _idAfter(Uri uri, String prefix) {
+    if (uri.host != _host || !uri.path.startsWith(prefix)) return null;
+    final id = uri.path.substring(prefix.length);
     return id.isEmpty ? null : Uri.decodeComponent(id);
   }
 
-  /// Starts listening. [navigator] is the app's navigator key, since links
-  /// arrive from outside the widget tree and there is no context to push with.
-  ///
-  /// Called after `runApp` — a link that launched the app is delivered by
-  /// [AppLinks.getInitialLink] and would otherwise be missed.
+  /// Called after `runApp`, so the link that launched the app is not missed.
   Future<void> init(GlobalKey<NavigatorState> navigator) async {
     _navigator = navigator;
     final pending = _pending;
     _pending = null;
     if (pending != null) unawaited(handleUri(pending));
-    _sub ??= _appLinks.uriLinkStream.listen(
-      handleUri,
-      // A malformed link is the sender's problem, not a crash.
-      onError: (_) {},
-    );
+    _sub ??= _appLinks.uriLinkStream.listen(handleUri, onError: (_) {});
     try {
       final initial = await _appLinks.getInitialLink();
       if (initial != null) await handleUri(initial);
-    } catch (_) {
-      // Nothing launched us; normal cold start.
-    }
+    } catch (_) {}
   }
 
-  /// Opens the wallpaper a link points at, if it points at one of ours.
-  ///
-  /// Public because notifications arrive through a different door but mean the
-  /// same thing — [PushService] hands campaign links straight here rather than
-  /// growing a second, subtly different resolver.
+  /// Also the entry point for links in notifications ([PushService]).
   Future<void> handleUri(Uri uri) async {
-    final id = wallpaperIdFrom(uri);
-    if (id == null) return;
-    // A build below the supported floor shows nothing but the update page;
-    // a link must not open the app around it.
+    final wallpaperId = _idAfter(uri, _wallpaperPrefix);
+    final collectionId = _idAfter(uri, _collectionPrefix)
+        ?.replaceAll('/', '')
+        .toLowerCase();
+    if (wallpaperId == null && collectionId == null) return;
+    // A build below the supported floor shows only the update page.
     if (UpdateService.instance.need == UpdateNeed.required) return;
     if (_navigator == null) {
       _pending = uri;
       return;
     }
 
-    // The catalog may still be loading on a cold start; this awaits it rather
-    // than dropping the link.
+    // Awaits a catalog that is still loading on a cold start.
     final Catalog catalog;
     try {
       catalog = await WallpaperRepository.instance.fetchCatalog();
@@ -111,19 +78,20 @@ class DeepLinkService {
       return;
     }
 
-    Wallpaper? match;
-    for (final w in catalog.wallpapers) {
-      if (w.id == id) {
-        match = w;
-        break;
-      }
+    final Widget? page;
+    if (collectionId != null) {
+      final collection = catalog.collection(collectionId);
+      page = collection == null ? null : CollectionPage(collection: collection);
+    } else {
+      final wallpaper = catalog.wallpapers
+          .where((w) => w.id == wallpaperId)
+          .firstOrNull;
+      page = wallpaper == null ? null : DetailPage(wallpaper: wallpaper);
     }
-    // Deleted since it was shared, or a hand-typed URL. Silently staying on the
-    // gallery beats an error the user can do nothing about.
-    if (match == null) return;
 
+    // An id that is gone or mistyped leaves the user where they are.
     final nav = _navigator?.currentState;
-    if (nav == null) return;
-    await nav.push(MaterialPageRoute(builder: (_) => DetailPage(wallpaper: match!)));
+    if (page == null || nav == null) return;
+    await nav.push(MaterialPageRoute(builder: (_) => page!));
   }
 }

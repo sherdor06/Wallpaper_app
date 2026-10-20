@@ -181,8 +181,10 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 
 ## Push, baho, yangilanish
 
-- Push: FCM topic `all`. Kampaniya custom data'si: `link` (share URL —
-  wallpaper ochiladi), `campaign` (analytics nomi; bo'lmasa sarlavha).
+- Push: FCM topic `all`. Kampaniya custom data'si: `link` —
+  `https://wallpapers-cdn.pages.dev/w/<id>` (wallpaper) yoki `/c/<kategoriya>`
+  (to'plam; faqat push uchun, intent filter va sayt `/c/` ni bilmaydi),
+  `campaign` (analytics nomi; bo'lmasa sarlavha).
   Bosilganda `push_open`. Ilova ochiq paytda kelgan push ko'rsatilmaydi.
 - Android kanal `new_wallpapers` (HIGH) `MainActivity` da yaratiladi, ikonka
   `ic_notification`. Kanal id'si o'zgartirilmaydi.
