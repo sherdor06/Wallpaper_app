@@ -288,8 +288,9 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 
 ## Loyiha faktlari
 
-- Play Store'da jonli: `1.0.1+4`. Keyingi release: `1.0.2+5` (share, App Links,
-  push, yangi bosh ekran, Settings).
+- Play Store'da jonli: `1.0.3+7` (Worlds, push, in-app update, store rating).
+  Keyingi release: `1.0.4+8` (Worlds ob-havosi, saqlash oqimi, Android 12+
+  engine tuzatmasi, to'plam havolasi, Yandex SDK 8.6).
 - Bundle/package: `com.sherdor.wallpapers` (ikkala platformada).
 - CDN: `wallpapers-cdn.pages.dev`, `scripts/out` dan `wrangler pages deploy`.
   `scripts/site/` (w.html, _redirects, assetlinks) deploy'dan oldin `out/` ga
