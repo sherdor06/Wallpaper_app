@@ -24,6 +24,9 @@ class RemoteConfigService {
   static const _kHomeStrip = 'home_strip';
   static const _kUpdateLatestBuild = 'update_latest_build';
   static const _kUpdateMinBuild = 'update_min_build';
+  static const _kAdUnitBannerAndroid = 'ad_unit_banner_android';
+  static const _kAdUnitInterstitialAndroid = 'ad_unit_interstitial_android';
+  static const _kAdUnitRewardedAndroid = 'ad_unit_rewarded_android';
 
   // Safe defaults (identical to the old constants) — used until/unless the
   // console overrides them.
@@ -50,6 +53,14 @@ class RemoteConfigService {
   // published. See UpdateService.
   static const int _defUpdateLatestBuild = 0;
   static const int _defUpdateMinBuild = 0;
+  // Empty: use the unit ids compiled into AdService. Set one from the console
+  // when a unit is replaced in the Yandex partner interface, so new ids reach
+  // users without a release. See [adUnitBannerAndroid].
+  static const String _defAdUnit = '';
+
+  /// What a Yandex ad unit id looks like. Anything else in the console is a
+  /// typo, and a typo would switch that format off for every user.
+  static final _adUnitPattern = RegExp(r'^R-M-\d+-\d+$');
 
   /// How long launch waits for a fetch. Launch sits behind the native splash
   /// until this returns, so the full [RemoteConfigSettings.fetchTimeout] was up
@@ -63,13 +74,16 @@ class RemoteConfigService {
   Future<void> init() async {
     try {
       final rc = FirebaseRemoteConfig.instance;
-      await rc.setConfigSettings(RemoteConfigSettings(
-        fetchTimeout: const Duration(seconds: 8),
-        // Debug: always fetch fresh. Release: throttle to once per hour so we
-        // don't hammer the backend and stay within Remote Config quotas.
-        minimumFetchInterval:
-            kReleaseMode ? const Duration(hours: 1) : Duration.zero,
-      ));
+      await rc.setConfigSettings(
+        RemoteConfigSettings(
+          fetchTimeout: const Duration(seconds: 8),
+          // Debug: always fetch fresh. Release: throttle to once per hour so we
+          // don't hammer the backend and stay within Remote Config quotas.
+          minimumFetchInterval: kReleaseMode
+              ? const Duration(hours: 1)
+              : Duration.zero,
+        ),
+      );
       await rc.setDefaults(<String, dynamic>{
         _kAdsEnabled: _defAdsEnabled,
         _kAdShowEvery: _defAdShowEvery,
@@ -82,6 +96,9 @@ class RemoteConfigService {
         _kHomeStrip: _defHomeStrip,
         _kUpdateLatestBuild: _defUpdateLatestBuild,
         _kUpdateMinBuild: _defUpdateMinBuild,
+        _kAdUnitBannerAndroid: _defAdUnit,
+        _kAdUnitInterstitialAndroid: _defAdUnit,
+        _kAdUnitRewardedAndroid: _defAdUnit,
       });
       // Readable from here on: the values activated on an earlier launch, or
       // the defaults. A failed fetch used to leave [_rc] null, so an offline
@@ -169,4 +186,17 @@ class RemoteConfigService {
   /// Builds below this number stop at a full-screen "Update required" page.
   /// For a build found to be broken, not for ordinary releases.
   int get updateMinBuild => _rc?.getInt(_kUpdateMinBuild) ?? _defUpdateMinBuild;
+
+  /// Android ad unit ids from the console, or null to keep the compiled-in
+  /// ones. Units live in the Yandex partner interface; when one is replaced
+  /// its id changes, and before these keys that meant a release. A value that
+  /// is not a unit id is ignored rather than trusted.
+  String? get adUnitBannerAndroid => _adUnit(_kAdUnitBannerAndroid);
+  String? get adUnitInterstitialAndroid => _adUnit(_kAdUnitInterstitialAndroid);
+  String? get adUnitRewardedAndroid => _adUnit(_kAdUnitRewardedAndroid);
+
+  String? _adUnit(String key) {
+    final v = (_rc?.getString(key) ?? _defAdUnit).trim();
+    return _adUnitPattern.hasMatch(v) ? v : null;
+  }
 }

@@ -17,8 +17,9 @@ class AnalyticsService {
   static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
   /// Add to `MaterialApp.navigatorObservers` for automatic screen views.
-  static final FirebaseAnalyticsObserver observer =
-      FirebaseAnalyticsObserver(analytics: _analytics);
+  static final FirebaseAnalyticsObserver observer = FirebaseAnalyticsObserver(
+    analytics: _analytics,
+  );
 
   /// Sends one event to Firebase and (when a key is set) Yandex AppMetrica.
   /// Both calls are fire-and-forget.
@@ -69,13 +70,17 @@ class AnalyticsService {
     _log('ad_impression', <String, Object>{'ad_type': type});
   }
 
+  /// An ad request came back without an ad. [code] is the network's error
+  /// code (on Android: 2 the unit was refused, 3 network, 4 no fill), so a
+  /// fill problem and a broken unit can be told apart on the dashboard.
+  static void logAdLoadFailed(String type, int code) {
+    _log('ad_load_failed', <String, Object>{'ad_type': type, 'code': code});
+  }
+
   /// A push notification was tapped. [target] is `link` when it carried a
   /// link, `app` when it only opened the app.
   static void logPushOpen({required String campaign, required String target}) {
-    _log('push_open', <String, Object>{
-      'campaign': campaign,
-      'target': target,
-    });
+    _log('push_open', <String, Object>{'campaign': campaign, 'target': target});
   }
 
   /// The store rating sheet was requested. Counts asks, not reviews: the store

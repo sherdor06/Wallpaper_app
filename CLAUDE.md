@@ -170,10 +170,34 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 
 - Yandex Mobile Ads to'g'ridan-to'g'ri, mediation yo'q. `AdService` interfeysi
   tarmoqdan mustaqil — tarmoq almashsa faqat shu fayl o'zgaradi.
-- Debug → `demo-*-yandex` unit'lar. Release → `R-M-19979404-1/2/3`.
+- Debug → `demo-*-yandex` unit'lar. Release → `R-M-19979404-1/2/3` (kodda
+  default). Android unit'ini Remote Config almashtiradi:
+  `ad_unit_banner_android`, `ad_unit_interstitial_android`,
+  `ad_unit_rewarded_android` — bo'sh bo'lsa kod'dagisi, `R-M-<n>-<n>`
+  formatida bo'lmasa e'tiborsiz. Partner interfeysda unit qayta yaratilsa,
+  yangi id konsolga yoziladi — release kerak emas.
+- Reklama yuklanmasa jim yutilmaydi: `ad_load_failed` (`ad_type`, `code`)
+  Firebase + AppMetrica'ga, sessiyada har tur bir marta. Android `code` 2
+  (`INVALID_REQUEST`) yoki 5 (`SYSTEM_ERROR`) = unit rad etilgan: Crashlytics'ga
+  non-fatal "Ad unit refused (<format>)", o'sha format sessiya oxirigacha
+  qayta so'ralmaydi, banner yig'iladi (bo'sh joy qolmaydi). Boshqa xatoda
+  banner 60 s da qayta urinadi, 3 tadan keyin yig'iladi.
+- "Provided AdUnitId '…' does not exist!" — server javobi (SDK ichida faqat
+  `NO_SUCH_AD_UNIT_ID` / 404 da chiqadi): muammo kodda emas, partner
+  interfeysda. Birinchi tekshiriladigan joy: In-app ads → Apps → ilova holati.
+  2026-11-19 da uchala unit shunday rad etilgan — sabab ilova **Paused**
+  holatda edi (Start bosiladi; unit ID'lar o'zgarmaydi, release kerak emas).
+  Release'da sababni ko'rish: vaqtincha `YandexAds.setLogging(true)`,
+  logcat'da `YandexAds` tegi.
+- Release'da reklama yo'lini tekshirish — demo unit bilan (vaqtinchalik
+  `bannerUnitId` ni `_demoBanner` qilib, commit qilinmaydi), haqiqiy unit'da
+  emulator ko'rsatishlari yig'ilmasin.
 - **Release build'da reklamani hech qachon bosmaslik.**
 - Banner navbar ustida, 50dp, inline. Qo'lda refresh qo'shilmaydi — SDK o'zi
   60s da yangilaydi.
+- **Debug build'da banner hech qayerda chiqmaydi** (haqiqiy telefonda ham) —
+  nav ustida turgani uchun test paytida tasodifan bosiladi. Telefonda debug'da
+  interstitial/rewarded demo unit'lardan keladi.
 - **Debug build simulyator/emulyatorda reklama umuman so'ralmaydi** — SDK
   ishga tushmaydi, demo unit ham yo'q. Banner yashirin; interstitial/rewarded
   o'rnida `AdStandIn` sahifasi: qaysi reklama, nima uchun (trigger, hisob),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kReleaseMode;
 import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter/widgets.dart' show GlobalKey, NavigatorState;
@@ -38,8 +39,10 @@ class AdService {
   ///
   /// Ads are shown by default in every build. For clean store screenshots hide
   /// them with `--dart-define=HIDE_ADS=true`.
-  static const bool adsHidden =
-      bool.fromEnvironment('HIDE_ADS', defaultValue: false);
+  static const bool adsHidden = bool.fromEnvironment(
+    'HIDE_ADS',
+    defaultValue: false,
+  );
 
   /// True when ads must not be shown at all — either the compile-time
   /// [adsHidden] flag, or the `ads_enabled` Remote Config kill switch is off.
@@ -81,8 +84,13 @@ class AdService {
   bool _canRequestAds = false;
   final Completer<bool> _adsAllowed = Completer<bool>();
 
-  /// Resolves once the SDK is up and consent has been applied — `true` if ads
-  /// may be requested. Ad widgets (e.g. the banner) await this before loading.
+  /// Resolves once the SDK is up and consent has been applied — `true` if the
+  /// banner may load. The banner awaits this before requesting anything.
+  ///
+  /// `false` in every debug build, real devices included: the banner sits
+  /// right above the nav bar, where a stray tap during testing lands on it.
+  /// Full-screen ads are unaffected — on a device they run on the demo units,
+  /// and they are what the frequency logic is tested on.
   Future<bool> get adsAllowed => _adsAllowed.future;
 
   /// Whether a rewarded ad could actually play, answered synchronously so the UI
@@ -122,6 +130,10 @@ class AdService {
   // (bundle com.sherdor.wallpapers). No SDK key exists in this SDK — the unit id
   // identifies the account, so there is nothing else to configure.
   //
+  // These are the defaults. Remote Config can replace each Android id (see
+  // RemoteConfigService.adUnitBannerAndroid), so a unit recreated in the
+  // partner interface needs no release.
+  //
   // TODO(sherdor): create the iOS units once the app ships on the App Store.
   // Yandex treats iOS as a separate app, so it gets its own ids rather than
   // reusing the Android ones.
@@ -142,14 +154,24 @@ class AdService {
   static const _demoInterstitial = 'demo-interstitial-yandex';
   static const _demoRewarded = 'demo-rewarded-yandex';
 
-  static String get _platformBanner => Platform.isIOS ? _bannerIos : _bannerAndroid;
+  /// The live unit for each format on this platform: the Remote Config
+  /// override where one is set, otherwise the id compiled in above.
+  static String get _platformBanner => Platform.isIOS
+      ? _bannerIos
+      : RemoteConfigService.instance.adUnitBannerAndroid ?? _bannerAndroid;
+  static String get _platformInterstitial => Platform.isIOS
+      ? _interstitialIos
+      : RemoteConfigService.instance.adUnitInterstitialAndroid ??
+            _interstitialAndroid;
+  static String get _platformRewarded => Platform.isIOS
+      ? _rewardedIos
+      : RemoteConfigService.instance.adUnitRewardedAndroid ?? _rewardedAndroid;
+
   String get bannerUnitId => kReleaseMode ? _platformBanner : _demoBanner;
-  String get _interstitialUnitId => kReleaseMode
-      ? (Platform.isIOS ? _interstitialIos : _interstitialAndroid)
-      : _demoInterstitial;
-  String get _rewardedUnitId => kReleaseMode
-      ? (Platform.isIOS ? _rewardedIos : _rewardedAndroid)
-      : _demoRewarded;
+  String get _interstitialUnitId =>
+      kReleaseMode ? _platformInterstitial : _demoInterstitial;
+  String get _rewardedUnitId =>
+      kReleaseMode ? _platformRewarded : _demoRewarded;
 
   /// True while a *release* build on *this platform* still has placeholder
   /// unit ids. Everything stays switched off in that state rather than firing
@@ -162,6 +184,68 @@ class AdService {
   /// which is what lets iOS be tested before its real ids exist.
   static bool get _credentialsMissing =>
       kReleaseMode && _platformBanner.startsWith('YOUR_');
+
+  // --- Failed loads --------------------------------------------------------
+  // Every failure used to be swallowed. In autumn 2026 the app was left
+  // paused in the partner interface, the network stopped recognising all
+  // three units, and nothing anywhere said so: the banner left an empty strip
+  // above the nav, no interstitial played, and every rewarded gate opened for
+  // free. What follows makes the next one visible.
+
+  /// Format names as analytics reports them (`ad_type`).
+  static const bannerFormat = 'banner';
+  static const _interstitialFormat = 'interstitial';
+  static const _rewardedFormat = 'rewarded';
+
+  /// Formats whose unit the network refused this session (see
+  /// [isPermanentFailure]). Not requested again until the next launch: a dead
+  /// unit answers every request the same way, and a client that keeps sending
+  /// them is the pattern networks flag.
+  final Set<String> _refused = {};
+
+  /// Failures already reported this session, as `format:code`. Once per kind
+  /// is enough to count the users it hits; a no-fill on every browse step
+  /// would only be noise.
+  final Set<String> _reported = {};
+
+  /// Whether [error] means the request itself was refused, so retrying cannot
+  /// help: the unit does not exist or is switched off (INVALID_REQUEST — the
+  /// SDK logs "Provided AdUnitId … does not exist!", which is also how a
+  /// paused app answers), or the SDK says to stop asking (SYSTEM_ERROR). Only
+  /// the partner interface, or a new unit id in Remote Config, can fix these.
+  ///
+  /// Android codes. iOS reports its own and has no units yet; add its codes
+  /// with its units.
+  static bool isPermanentFailure(Object error) =>
+      Platform.isAndroid &&
+      error is AdRequestError &&
+      (error.code == 2 || error.code == 5);
+
+  /// Whether [format] was refused earlier this session, so the caller should
+  /// not ask again.
+  bool wasRefused(String format) => _refused.contains(format);
+
+  /// Records a failed load of [format]: one analytics event per kind of
+  /// failure, and for a refused unit a non-fatal in Crashlytics as well,
+  /// because that means no user sees this format until someone fixes it.
+  void reportLoadFailure(String format, Object error) {
+    final code = error is AdRequestError ? error.code : -1;
+    final permanent = isPermanentFailure(error);
+    if (permanent) _refused.add(format);
+    if (!_reported.add('$format:$code')) return;
+    AnalyticsService.logAdLoadFailed(format, code);
+    if (permanent) {
+      unawaited(
+        FirebaseCrashlytics.instance
+            .recordError(
+              error,
+              StackTrace.current,
+              reason: 'Ad unit refused ($format)',
+            )
+            .catchError((Object _) {}),
+      );
+    }
+  }
 
   // --- Full-screen ad state -------------------------------------------------
   // Each holds at most one loaded ad, consumed on show and reloaded after.
@@ -211,7 +295,7 @@ class AdService {
 
     await YandexAds.initialize();
     _canRequestAds = true;
-    if (!_adsAllowed.isCompleted) _adsAllowed.complete(true);
+    if (!_adsAllowed.isCompleted) _adsAllowed.complete(!kDebugMode);
 
     _interstitialLoader = InterstitialAdLoader();
     _rewardedLoader = RewardedAdLoader();
@@ -278,14 +362,21 @@ class AdService {
   /// hammering the network after a no-fill.
   Future<void> _preloadInterstitial() async {
     final loader = _interstitialLoader;
-    if (loader == null || _interstitial != null || _loadingInterstitial) return;
+    if (loader == null ||
+        _interstitial != null ||
+        _loadingInterstitial ||
+        wasRefused(_interstitialFormat)) {
+      return;
+    }
     _loadingInterstitial = true;
     try {
       _interstitial = await loader.loadAd(
         adRequest: AdRequest(adUnitId: _interstitialUnitId),
       );
-    } catch (_) {
-      // No fill or a network error — try again on the next trigger.
+    } catch (e) {
+      // No fill or a network error — try again on the next trigger. A refused
+      // unit is not asked again this session.
+      reportLoadFailure(_interstitialFormat, e);
     } finally {
       _loadingInterstitial = false;
     }
@@ -293,14 +384,20 @@ class AdService {
 
   Future<void> _preloadRewarded() async {
     final loader = _rewardedLoader;
-    if (loader == null || _rewarded != null || _loadingRewarded) return;
+    if (loader == null ||
+        _rewarded != null ||
+        _loadingRewarded ||
+        wasRefused(_rewardedFormat)) {
+      return;
+    }
     _loadingRewarded = true;
     try {
       _rewarded = await loader.loadAd(
         adRequest: AdRequest(adUnitId: _rewardedUnitId),
       );
-    } catch (_) {
+    } catch (e) {
       // Same as above — the next unlock attempt re-requests.
+      reportLoadFailure(_rewardedFormat, e);
     } finally {
       _loadingRewarded = false;
     }
@@ -334,7 +431,9 @@ class AdService {
     if (_adsOff || !_canRequestAds) return;
     _browseCount++;
     if (_browseCount % _browseEvery != 0) return;
-    await _showInterstitial('Browse step — $_browseCount of every $_browseEvery');
+    await _showInterstitial(
+      'Browse step — $_browseCount of every $_browseEvery',
+    );
   }
 
   /// Shows the preloaded interstitial if the shared full-screen cooldown has
@@ -347,7 +446,7 @@ class AdService {
       await _showStandIn(
         kind: AdStandInKind.interstitial,
         trigger: trigger,
-        unitId: Platform.isIOS ? _interstitialIos : _interstitialAndroid,
+        unitId: _platformInterstitial,
       );
       return true;
     }
@@ -359,7 +458,7 @@ class AdService {
     }
     _interstitial = null;
     _noteFullScreenShown();
-    AnalyticsService.logAdImpression('interstitial');
+    AnalyticsService.logAdImpression(_interstitialFormat);
     try {
       await ad.setAdEventListener(eventListener: InterstitialAdEventListener());
       await ad.show();
@@ -396,7 +495,7 @@ class AdService {
       final play = _showStandIn(
         kind: AdStandInKind.rewarded,
         trigger: 'Unlock — rewarded ad before the download',
-        unitId: Platform.isIOS ? _rewardedIos : _rewardedAndroid,
+        unitId: _platformRewarded,
       ).then((_) => true);
       _rewardInFlight = play;
       try {
@@ -433,12 +532,14 @@ class AdService {
   }) async {
     final nav = _navigator?.currentState;
     if (nav == null) return;
-    await nav.push(AdStandIn.route(
-      kind: kind,
-      trigger: trigger,
-      unitId: unitId,
-      cooldown: _minGap,
-    ));
+    await nav.push(
+      AdStandIn.route(
+        kind: kind,
+        trigger: trigger,
+        unitId: unitId,
+        cooldown: _minGap,
+      ),
+    );
   }
 
   /// Plays [ad] to completion and reports whether the unlock is granted.
@@ -452,7 +553,7 @@ class AdService {
     Reward? reward;
 
     _noteFullScreenShown();
-    AnalyticsService.logAdImpression('rewarded');
+    AnalyticsService.logAdImpression(_rewardedFormat);
     try {
       await ad.setAdEventListener(
         eventListener: RewardedAdEventListener(

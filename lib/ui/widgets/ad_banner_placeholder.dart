@@ -21,11 +21,16 @@ import '../../services/ad_service.dart';
 /// screen-pinned slot and came back 100dp tall, which is a lot of the screen to
 /// hand to an ad that sits directly above the nav bar. [_maxHeight] caps it.
 ///
-/// The [AdWidget] is mounted the moment the ad object exists, not once it has
-/// loaded. That order is load-bearing: `BannerAd.load` only sends its request
-/// from the platform view's creation callback, so a widget that waited for
-/// "loaded" before mounting the view would wait forever. Until the ad paints,
-/// the view is 1dp tall and sits invisibly over the placeholder.
+/// The [AdWidget] is mounted as soon as `BannerAd.load` has built the ad's
+/// platform view, not once the ad has loaded. That order is load-bearing: the
+/// request is only sent from the view's creation callback, so a widget that
+/// waited for "loaded" before mounting the view would wait forever. Until the
+/// ad paints, the view is 1dp tall and sits invisibly over the placeholder.
+///
+/// When the banner cannot fill — the network refused the unit, or every retry
+/// came back empty — the ad is destroyed and the strip collapses. In November
+/// 2026 the network was found refusing the unit, and the reserved strip had
+/// been sitting empty above every user's nav bar.
 class AdBannerPlaceholder extends StatefulWidget {
   const AdBannerPlaceholder({super.key});
 
@@ -52,6 +57,8 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
   BannerAd? _ad;
   Timer? _retryTimer;
   StreamSubscription<BannerAdLoadState>? _loadStates;
+
+  /// Loads sent since the last one that filled.
   int _attempts = 0;
   int? _reservedHeight;
   bool _loaded = false;
@@ -65,25 +72,37 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
   /// not be left looking at an empty grey strip where a banner will one day be.
   bool? _adsPossible;
 
+  /// True once this banner has stopped trying for the session (see
+  /// [_giveUp]); it then takes no space, like [_adsPossible] false.
+  bool _gaveUp = false;
+
   @override
   void initState() {
     super.initState();
     // Skip entirely when ads are hidden (e.g. store screenshots).
     if (AdService.adsHidden) return;
-    // Wait until the SDK is up and consent is applied before requesting. A
-    // debug run on a simulator answers false here (no ad is requested there
-    // at all — see AdService), so the strip collapses.
-    unawaited(AdService.instance.adsAllowed.then((allowed) {
-      if (!mounted) return;
-      setState(() => _adsPossible = allowed);
-      if (allowed) unawaited(_setup());
-    }));
+    // Wait until the SDK is up and consent is applied before requesting. Any
+    // debug run answers false here (see AdService.adsAllowed), so the strip
+    // collapses and nothing is requested.
+    unawaited(
+      AdService.instance.adsAllowed.then((allowed) {
+        if (!mounted) return;
+        setState(() => _adsPossible = allowed);
+        if (allowed) unawaited(_setup());
+      }),
+    );
   }
 
   /// Reserves the banner's height, then kicks off the first load.
   Future<void> _setup() async {
     if (_setupStarted) return;
     _setupStarted = true;
+    // Refused earlier this session — the shell was rebuilt, say. The answer
+    // will not have changed.
+    if (AdService.instance.wasRefused(AdService.bannerFormat)) {
+      _giveUp();
+      return;
+    }
 
     final width = MediaQuery.sizeOf(context).width.truncate();
     final size = BannerAdSize.inline(width: width, maxHeight: _maxHeight);
@@ -102,6 +121,12 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     _loadStates = ad.loadStateStream.listen(_onLoadState);
     _ad = ad;
     await _load();
+    // `load` has built the ad's platform view by now, but AdWidget only
+    // rebuilds itself once an ad has loaded, so mount the view here. This used
+    // to ride on the measurement's setState above landing in the same frame;
+    // when the measurement failed, the view was never mounted and the banner
+    // never requested anything.
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -110,8 +135,8 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     _attempts++;
     try {
       await ad.load(AdRequest(adUnitId: AdService.instance.bannerUnitId));
-    } catch (_) {
-      _onFailed();
+    } catch (e) {
+      _onFailed(e);
     }
   }
 
@@ -119,21 +144,40 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     if (!mounted) return;
     if (state is BannerAdLoadStateLoaded) {
       _retryTimer?.cancel();
+      _attempts = 0;
       setState(() {
         _loaded = true;
         _reservedHeight = state.height;
       });
     } else if (state is BannerAdLoadStateError) {
-      _onFailed();
+      _onFailed(state.error);
     }
   }
 
-  void _onFailed() {
+  void _onFailed(Object error) {
     if (!mounted) return;
+    AdService.instance.reportLoadFailure(AdService.bannerFormat, error);
+    // A refused unit answers every retry the same way.
+    if (AdService.isPermanentFailure(error) || _attempts >= _maxAttempts) {
+      _giveUp();
+      return;
+    }
     setState(() => _loaded = false);
-    if (_attempts >= _maxAttempts) return;
     _retryTimer?.cancel();
     _retryTimer = Timer(_retryAfter, _load);
+  }
+
+  /// Stops for the rest of the session: cancels the retry, destroys the ad
+  /// and collapses the strip. A band of empty space above the nav says
+  /// "broken" more than no banner does.
+  void _giveUp() {
+    _retryTimer?.cancel();
+    _loadStates?.cancel().ignore();
+    _loadStates = null;
+    final ad = _ad;
+    _ad = null;
+    ad?.destroy().ignore();
+    if (mounted) setState(() => _gaveUp = true);
   }
 
   @override
@@ -149,8 +193,9 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
   Widget build(BuildContext context) {
     // Ads hidden -> take up no space at all (clean screenshots).
     if (AdService.adsHidden) return const SizedBox.shrink();
-    // Resolved to "never" -> same, no dead strip at the bottom of the screen.
-    if (_adsPossible == false) return const SizedBox.shrink();
+    // Resolved to "never", or given up on -> same, no dead strip at the
+    // bottom of the screen.
+    if (_adsPossible == false || _gaveUp) return const SizedBox.shrink();
 
     final height = _reservedHeight?.toDouble() ?? _fallbackHeight;
     final ad = _ad;
@@ -168,18 +213,24 @@ class _AdBannerPlaceholderState extends State<AdBannerPlaceholder> {
     );
   }
 
-  Widget _placeholder(double height) => Container(
-        height: height,
-        width: double.infinity,
-        color: Colors.white10,
-        alignment: Alignment.center,
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.ads_click, size: 16, color: Colors.white38),
-            SizedBox(width: 8),
-            Text('Ad', style: TextStyle(color: Colors.white38, fontSize: 12)),
-          ],
-        ),
-      );
+  /// Drawn from the theme: the white-on-white it used to be vanished on the
+  /// light theme, which made the reserved strip look like a layout gap.
+  Widget _placeholder(double height) {
+    final on = Theme.of(context).colorScheme.onSurface;
+    final ink = on.withValues(alpha: 0.38);
+    return Container(
+      height: height,
+      width: double.infinity,
+      color: on.withValues(alpha: 0.04),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.ads_click, size: 16, color: ink),
+          const SizedBox(width: 8),
+          Text('Ad', style: TextStyle(color: ink, fontSize: 12)),
+        ],
+      ),
+    );
+  }
 }
