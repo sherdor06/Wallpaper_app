@@ -3,6 +3,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/app_store.dart';
 import '../services/ad_service.dart';
 import '../services/consent_service.dart';
 import '../services/push_service.dart';
@@ -20,8 +21,6 @@ class SettingsPage extends StatelessWidget {
   /// policy URL is a store-compliance failure. Pages is on the free tier and is
   /// already where the app reads its catalog from.
   static const _privacyUrl = 'https://wallpapers-cdn.pages.dev/privacy';
-  static const _storeUrl =
-      'https://play.google.com/store/apps/details?id=com.sherdor.wallpapers';
   static const _contactEmail = 'sherdor0605@gmail.com';
 
   Future<void> _open(Uri uri) async {
@@ -106,7 +105,7 @@ class SettingsPage extends StatelessWidget {
               icon: Icons.star_outline,
               title: 'Rate the app',
               external: true,
-              onTap: () => _open(Uri.parse(_storeUrl)),
+              onTap: () => _open(AppStore.current.listing),
             ),
             SettingsRow(
               icon: Icons.mail_outline,

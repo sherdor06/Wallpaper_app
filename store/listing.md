@@ -1,72 +1,152 @@
-# Store listing — Wallpapers 4K
+# Store listing — Wavely
 
-> Play Console (va keyin App Store Connect) formalariga ko'chirib qo'yish uchun
-> tayyor matnlar. Inglizcha (Tier-1 auditoriya / ASO uchun).
+> Do'kon formalariga ko'chirish uchun tayyor matnlar. Play'dagi inglizcha matn
+> asos qilingan, raqamlar katalogga moslangan (2026-11: 1 762 rasm, 677 tasi
+> 4K, 22 to'plam). Play'dagi matnda hali "1,400+" va "most of them in true 4K"
+> turibdi — keyingi Play yangilanishida shu yerdagi bilan almashtiriladi.
 
 ---
 
-## App name (30 belgigacha)
+## Русский (RuStore, Galaxy Store / AppGallery — ru)
+
+**Название**
 
 ```
-Wallpapers 4K - HD Backgrounds
+Wavely — обои 4K и HD
 ```
 
-## Short description (80 belgigacha)
+**Краткое описание** (≤80)
 
 ```
-Stunning 4K wallpapers & HD backgrounds. Browse, save and set in one tap.
+1700+ отобранных обоев в 4K и HD, а ещё живые обои из ваших фото
 ```
 
-## Full description (4000 belgigacha)
+**Полное описание**
 
 ```
-Make your phone stand out with Wallpapers 4K — a fast, beautiful gallery of
-high-resolution wallpapers and backgrounds, hand-picked for modern screens.
+Wavely — это тщательно отобранная коллекция обоев, а не бесконечная свалка
+картинок низкого качества. Более 1700 фонов, и каждый выбран вручную.
 
-✦ WHY WALLPAPERS 4K?
+Все обои — в высоком разрешении, сотни из них в настоящем 4K. Они остаются
+чёткими на современных экранах и не расплываются при масштабировании.
 
-• 4K & HD quality — crisp, vibrant images tuned for OLED and AMOLED displays
-• One-tap setup — set any wallpaper to your Home screen, Lock screen, or both
-• Fast browsing — smooth gallery with categories: Nature, City, Abstract and more
-• Favorites — save the ones you love and find them instantly
-• Search — find the perfect background in seconds
-• Download — keep any wallpaper in your gallery
-• Dark, minimal design that stays out of the way
-• Lightweight and free
+ЧТО ВНУТРИ
 
-✦ FRESH CONTENT
+• 1700+ обоев, отобранных вручную и разложенных по подборкам
+• Качество 4K, Full HD и HD
+• Более 20 подборок — легко найти то, что нужно
+• Новые обои появляются регулярно, без обновления приложения
+• Wavely Worlds — живые обои из вашего фото или готовой сцены: дождь, снег,
+  туман и облака
 
-New wallpapers are added regularly — check back for the latest collections.
+ПОДБОРКИ
 
-✦ CATEGORIES
+Природа · Животные · Космос · Авто · Абстракция · Цветы · Город · Спорт ·
+Техника · Архитектура · Искусство · Океан · Горы · Градиенты · Минимализм ·
+Girly · Aesthetic и другие
 
-Nature • City • Abstract • AMOLED • Space • Minimal — with more on the way.
+БЫСТРО И УДОБНО
 
-Download Wallpapers 4K now and give your screen a new look every day!
+• Мгновенный просмотр — картинки подгружаются по мере прокрутки
+• Главный экран, экран блокировки или оба — в одно касание
+• Сохранение любых обоев в галерею
+• Избранное — любимые обои в одном месте
+• Архив — все обои, которые вы ставили, по порядку
+• Поиск по подборкам и настроению
+• Светлая и тёмная тема
+
+БЕРЕЖНО К ВАШЕМУ ТЕЛЕФОНУ
+
+• Без регистрации — открыли и пользуетесь
+• Избранное и история хранятся только на устройстве
+• Небольшой размер, работает на телефонах и планшетах
+
+Скачайте Wavely — и пусть экран вашего телефона радует каждый день.
 ```
 
-## Keywords / ASO eslatmalar
+**Что нового (1.0.5)**
 
-- Asosiy: `4k wallpapers`, `hd wallpapers`, `backgrounds`, `amoled wallpapers`,
-  `phone wallpaper`, `lock screen`
-- Sarlavha + short description allaqachon "4K", "HD", "backgrounds" ni o'z ichiga oladi.
-- iOS keyword maydoniga (100 belgi): `wallpaper,4k,hd,background,amoled,lock screen,home screen,dark`
+```
+Первая версия в магазине. Подборки, Wavely Worlds с погодой и сохранение
+живых обоев.
+```
 
-## Play Console'da kerak bo'ladigan javoblar
+---
 
-- **Privacy policy URL:** `https://wallpapers-cdn.pages.dev/privacy`
-  (keyin custom domenga ko'chirsangiz URL'ni yangilang)
-- **Ads:** Yes, contains ads (AdMob)
-- **In-app purchases:** No
-- **Data safety (qisqacha):**
-  - Data collected by the app itself: none (no accounts; favorites local)
-  - Third party (AdMob): Device or other IDs — Advertising ID; collected for
-    advertising; not shared by us directly
-- **Target audience:** 13+ (yoki Everyone — reklama sozlamasiga qarab)
-- **Category:** Personalization
+## English (Galaxy Store / AppGallery — en)
 
-## Screenshotlar (keyin)
+**Title**
 
-Kerak bo'ladi: kamida 2 ta telefon screenshot (1080×1920+). Tavsiya: Home grid,
-Detail (Save/Set tugmalari bilan), Favorites, Search — eng chiroyli wallpaperlar bilan.
-Haqiqiy kontent yuklangach olamiz.
+```
+Wavely — 4K Wallpapers HD
+```
+
+**Short description** (≤80)
+
+```
+1,700+ handpicked wallpapers in 4K & HD, plus live scenes from your photos
+```
+
+**Full description**
+
+```
+Wavely is a carefully curated wallpaper app — not an endless dump of
+low-quality images, but 1,700+ handpicked backgrounds chosen one by one.
+
+Every wallpaper is in high resolution, hundreds of them in true 4K, so they
+stay razor-sharp on modern phone displays instead of turning into a blurry
+mess when your device scales them up.
+
+WHAT YOU GET
+
+• 1,700+ wallpapers, hand-selected and organised into collections
+• 4K, Full HD and HD quality
+• 20+ collections, so you actually find what you want
+• New wallpapers added regularly — no app update needed
+• Wavely Worlds — a live wallpaper from your own photo or a ready scene:
+  rain, snow, fog and clouds
+
+COLLECTIONS
+
+Nature · Animals · Space · Cars · Abstract · Flowers · City · Sport · Tech ·
+Architecture · Art · Ocean · Mountains · Gradient · Minimal · Girly ·
+Aesthetic and more
+
+BUILT TO BE FAST
+
+• Instant browsing — images load as you scroll, nothing stutters
+• Set as home screen, lock screen, or both, in one tap
+• Save any wallpaper straight to your gallery
+• Favorites — keep the ones you love in one place
+• Archive — every wallpaper you have applied, in order, easy to reapply
+• Search by collection and mood
+• Light and dark theme, following your system setting
+
+RESPECTS YOUR PHONE
+
+• No account required — open it and use it
+• Favorites and history stay on your device
+• Small download size, light on storage
+• Works on phones and tablets
+
+Download Wavely and give your phone a screen worth looking at.
+```
+
+---
+
+## Har do'kon uchun umumiy javoblar
+
+- **Privacy policy:** `https://wallpapers-cdn.pages.dev/privacy`
+- **Support email:** `sherdor0605@gmail.com`
+- **Kategoriya:** Personalization / Персонализация
+- **Reklama:** bor (Yandex Mobile Ads). Ichki xarid: yo'q.
+- **Yosh reytingi:** Play'da "Everyone" — boshqa do'konlarda eng kichik
+  (0+/3+) belgilanadi.
+- **Ma'lumotlar:** akkaunt yo'q; sevimlilar va tarix qurilmada. Reklama va
+  analitika (Firebase, AppMetrica, Yandex Ads) qurilma ID'si va diagnostikani
+  oladi.
+- **Ikonka:** `assets/icon/playstore_512.png` (512×512).
+- **AppGallery qisqa tavsifi** (≤25 tavsiya): `Handpicked 4K wallpapers` /
+  `Отобранные обои в 4K`. Ilova nomi faqat `Wavely` (APK label bilan bir xil).
+- **APK:** har do'kon o'z build'ini oladi — `--dart-define=STORE=<id>`
+  (`lib/config/app_store.dart`).

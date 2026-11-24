@@ -233,6 +233,47 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 - Remote Config launch'da ko'pi bilan 3 s kutadi; kechikkan fetch keyingi
   launch'da qo'llanadi.
 
+## Do'konlar
+
+- Android Play'dan tashqari RuStore, Galaxy Store va AppGallery'ga chiqadi.
+  Har do'kon o'z APK'sini oladi: `flutter build apk --release
+  --target-platform android-arm,android-arm64
+  --dart-define=STORE=rustore|galaxy|appgallery` (x86_64 faqat emulyatorga
+  kerak, APK uchdan biriga kichrayadi); Play AAB define'siz (`AppStore.play`). Do'konga olib boradigan hamma narsa ("Rate the app",
+  yangilanish) `AppStore.current` (`lib/config/app_store.dart`) orqali.
+- Ilova boshqa do'konga havola bermaydi — Galaxy Store va RuStore buni rad
+  etadi. Play'ning in-app update va review oynasi faqat Play build'ida.
+  Kodda `play.google.com` qattiq yozilsa — xato.
+- Do'kon APK'lari upload kalit bilan imzolanadi (SHA-256 `80:8E:…:EB:12`,
+  `assetlinks.json` da bor — havolalar ishlaydi); Play o'rnatmasi Google'ning
+  kaliti bilan. Shuning uchun Play'dan o'rnatilgan ilova boshqa do'kon APK'si
+  bilan yangilanmaydi va aksincha. `upload-keystore.jks` + `key.properties`
+  zaxirasi shart: yo'qolsa, boshqa do'konlardagi ilova boshqa yangilanmaydi.
+- `update_latest_build` / `update_min_build` hamma do'konga bitta: build har
+  bir do'konda chiqqandan keyingina ko'tariladi.
+- Matnlar `store/listing.md` da (ru/en).
+- Galaxy Store: Seller Portal akkaunti bor (private seller, 2026-11-20), lekin
+  Samsung Android ilovani faqat korporativ commercial seller'dan qabul qiladi
+  — jismoniy shaxs ilova qo'sha olmaydi. Firma/YaTT hujjatlari (D-U-N-S)
+  bo'lmaguncha Galaxy'ga chiqilmaydi. Samsung boshqa egasi bor kontent
+  (filmlar, o'yinlar, logotiplar, odamlar) uchun litsenziya ham so'raydi.
+- RuStore konsoliga VK ID orqali kiriladi (VK akkaunti Google'ga
+  bog'langan). Ko'p SMS so'rovi VK'da "Flood control" beradi — bir necha
+  soat kutiladi yoki VK ilovasidagi QR bilan kiriladi.
+- RuStore'da jismoniy shaxs akkaunti faqat Rossiya rezidentiga. Rezident
+  bo'lmagan — faqat yuridik shaxs yoki YaTT sifatida: soliq/ro'yxat raqami,
+  ta'sis/ro'yxatdan o'tish hujjati (rus yoki ingliz tilida, aks holda notarial
+  tarjima) va boshqa do'kondagi ilova havolasi. YaTT hujjati bo'lmaguncha
+  RuStore'ga chiqilmaydi (2026-11-24).
+- AppGallery (App ID `119947875`): do'kondagi nom APK label'i bilan bir xil
+  bo'lishi shart — "Wavely", kalit so'zlar tavsifga yoziladi. Xitoy
+  chiqarilgan (u yerda MIIT filing kerak). Mamlakatlar ro'yxati o'zgarsa paket
+  versiyadan ajraladi — APK qayta yuklanadi. Qisqa tavsif ≤25 belgi tavsiya
+  etiladi (`store/listing.md`).
+- AppGallery Connect privacy URL'ni (`pages.dev`) ocholmaydi — tekshiruv
+  Xitoydan bo'lsa kerak. Shu sabab bilan rad etilsa, privacy sahifasi Xitoydan
+  ochiladigan hostga ko'chiriladi.
+
 ## Git
 
 - **Commit faqat foydalanuvchi "commit" deganda** — ish tugagach, saralab:

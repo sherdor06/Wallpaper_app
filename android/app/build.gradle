@@ -58,6 +58,20 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
+
+    // Store APKs are ARM-only (`--target-platform android-arm,android-arm64`),
+    // which drops Flutter's own x86 libraries but not the plugins'. A half-filled
+    // lib/x86_64 makes an x86_64 device pick that ABI and crash without
+    // libflutter.so, so the x86 folders go whenever Flutter's do.
+    def targetPlatforms = project.findProperty("target-platform")?.toString()
+    if (targetPlatforms != null && !targetPlatforms.contains("android-x64")) {
+        packaging {
+            jniLibs {
+                excludes.add("lib/x86_64/**")
+                excludes.add("lib/x86/**")
+            }
+        }
+    }
 }
 
 // No ad-network dependency here: the yandex_mobileads plugin brings the SDK.

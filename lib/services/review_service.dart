@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../config/app_store.dart';
 import 'analytics_service.dart';
 import 'history_service.dart';
 import 'push_service.dart';
@@ -23,8 +24,9 @@ import 'push_service.dart';
 /// the happy users to the sheet, so it is called directly.
 ///
 /// On Android the sheet only shows in builds installed from Play (internal
-/// testing counts); a `flutter run` build gets a silent no-op. The iOS
-/// simulator shows it every time.
+/// testing counts); a `flutter run` build gets a silent no-op, and a build for
+/// another store ([AppStore]) does not ask at all. The iOS simulator shows it
+/// every time.
 class ReviewService {
   ReviewService._();
   static final ReviewService instance = ReviewService._();
@@ -54,6 +56,7 @@ class ReviewService {
   /// a rating asked for straight after an ad is a rating of the ad.
   Future<void> maybeAsk() async {
     if (_askedThisRun) return;
+    if (Platform.isAndroid && !AppStore.current.hasPlayFlows) return;
     if (HistoryService.instance.ids.length < _afterSaves) return;
     // The notification prompt may be on screen from this same tap. Two system
     // dialogs in a row read as the app nagging, and the review loses.

@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/app_store.dart';
 import 'remote_config_service.dart';
 
 /// What this build owes the user about updating.
@@ -34,14 +35,14 @@ enum UpdateNeed {
 /// stays usable, then a restart the user chooses. The hard stop is Play's
 /// immediate flow. Where Play cannot run the flow — a build not installed from
 /// Play, or a Play without the update yet — both fall back to the store page.
+/// Builds for other stores ([AppStore]) never touch Play: they go straight to
+/// their own store's page. The build numbers are shared by every store, so
+/// they are raised only once each store has published the build.
 ///
 /// iOS stays out until the app has an App Store listing to send people to.
 class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
-
-  static const _playUrl =
-      'https://play.google.com/store/apps/details?id=com.sherdor.wallpapers';
 
   /// A declined offer is not repeated for this long, however many launches
   /// come in between.
@@ -80,17 +81,14 @@ class UpdateService {
   /// * [OfferResult.nothing] — nothing to show.
   Future<OfferResult> offer() async {
     if (need != UpdateNeed.suggested) return OfferResult.nothing;
+    if (!AppStore.current.hasPlayFlows) return _offerStorePage();
     final AppUpdateInfo info;
     try {
       info = await InAppUpdate.checkForUpdate();
     } catch (_) {
       // Not installed from Play: no flow to run, but the user may still want
       // the newer build.
-      if (!await _askedRecently()) {
-        await _noteAsked();
-        return OfferResult.storeOnly;
-      }
-      return OfferResult.nothing;
+      return _offerStorePage();
     }
     // Downloaded on an earlier launch and never installed: no need to ask
     // twice, only to finish.
@@ -116,6 +114,14 @@ class UpdateService {
     }
   }
 
+  /// The offer where no in-app flow can run: the store page, no more often
+  /// than [_snooze] allows.
+  Future<OfferResult> _offerStorePage() async {
+    if (await _askedRecently()) return OfferResult.nothing;
+    await _noteAsked();
+    return OfferResult.storeOnly;
+  }
+
   /// Installs a flexible update and restarts the app.
   Future<void> installDownloaded() async {
     try {
@@ -128,24 +134,29 @@ class UpdateService {
   /// The required-update path: Play's full-screen flow where it can run, the
   /// store page otherwise.
   Future<void> updateNow() async {
-    try {
-      final info = await InAppUpdate.checkForUpdate();
-      if (info.updateAvailability == UpdateAvailability.updateAvailable &&
-          info.immediateUpdateAllowed) {
-        // Declining Play's screen leaves the user on the page, free to tap
-        // again; only a flow that failed is sent on to the store.
-        final result = await InAppUpdate.performImmediateUpdate();
-        if (result != AppUpdateResult.inAppUpdateFailed) return;
+    if (AppStore.current.hasPlayFlows) {
+      try {
+        final info = await InAppUpdate.checkForUpdate();
+        if (info.updateAvailability == UpdateAvailability.updateAvailable &&
+            info.immediateUpdateAllowed) {
+          // Declining Play's screen leaves the user on the page, free to tap
+          // again; only a flow that failed is sent on to the store.
+          final result = await InAppUpdate.performImmediateUpdate();
+          if (result != AppUpdateResult.inAppUpdateFailed) return;
+        }
+      } catch (_) {
+        // Fall through to the store.
       }
-    } catch (_) {
-      // Fall through to the store.
     }
     await openStore();
   }
 
   Future<void> openStore() async {
     try {
-      await launchUrl(Uri.parse(_playUrl), mode: LaunchMode.externalApplication);
+      await launchUrl(
+        AppStore.current.listing,
+        mode: LaunchMode.externalApplication,
+      );
     } catch (_) {
       // No browser or store app; nothing more the app can do.
     }
