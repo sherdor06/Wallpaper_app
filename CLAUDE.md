@@ -353,13 +353,16 @@ chiqsa shu yerga qo'shiladi; eskirgani o'chiriladi.
 
 ## Loyiha faktlari
 
-- Play Store'da jonli: `1.0.3+7` (Worlds, push, in-app update, store rating).
-  Keyingi release: `1.0.4+8` (Worlds ob-havosi, saqlash oqimi, Android 12+
-  engine tuzatmasi, to'plam havolasi, Yandex SDK 8.6).
+- Play Store'da jonli: `1.0.4+8` (Worlds ob-havosi, saqlash oqimi, Android
+  12+ engine tuzatmasi, to'plam havolasi, Yandex SDK 8.6). Keyingi release:
+  `1.0.5+9` (reklama xatolari hisoboti va yig'iladigan banner, Remote Config
+  unit'lari, do'konlarga alohida build).
+- AppGallery: `1.0.5+9` 2026-11-24 da ko'rib chiqishga yuborilgan.
 - Bundle/package: `com.sherdor.wallpapers` (ikkala platformada).
 - CDN: `wallpapers-cdn.pages.dev`, `scripts/out` dan `wrangler pages deploy`.
   `scripts/site/` (w.html, _redirects, assetlinks) deploy'dan oldin `out/` ga
   nusxalanadi — `out/` gitignore'da.
 - `app-ads.txt` bu repoda emas: `sherdor06/sherdor-portfolio` → `public/`.
 - Privacy: `https://wallpapers-cdn.pages.dev/privacy`.
-- Yandex: app ID `19979404`, publisher `330661293`. Moderatsiya o'tgan.
+- Yandex: app ID `19979404`, publisher `330661293`. Moderatsiya o'tgan,
+  shartnoma (oferta) 2026-11-19 dan faol.
